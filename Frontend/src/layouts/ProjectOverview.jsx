@@ -1,0 +1,79 @@
+import { useEffect } from "react";
+import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
+
+const ProjectOverview = () => {
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  const { projectId, projectName } = location.state || {};
+
+  const activetab = location.pathname
+    .split("/")
+    .pop()
+    ?.replace(/^\w/, (c) => c.toUpperCase());
+
+  const tabClass =
+    "px-[0.7vw] py-[0.3vw] rounded-full font-medium text-[0.8vw] transition-all";
+  const activeClass = "bg-blue-600 text-white";
+  const inactiveClass = "bg-gray-200 text-gray-600 hover:bg-gray-300";
+
+  useEffect(() => {
+    if (location.pathname.endsWith("projectOverview/")) {
+      navigate("overview", {
+        replace: true,
+        state: { projectId, projectName },
+      });
+    }
+  }, [location.pathname, navigate, projectId, projectName]);
+
+  return (
+    <div className="p-[0.3vw] text-black">
+      <div className="text-[0.85vw] text-gray-500 ">
+        <span
+          onClick={() => navigate("/projects")}
+          className="cursor-pointer hover:text-[#3B82F6]"
+        >
+          Projects
+        </span>
+        <span className="m-[0.3vw]">{"/"}</span>
+        <span className="cursor-pointer hover:text-[#3B82F6]"
+          onClick={() => {
+            window.dispatchEvent(new CustomEvent("closeAddTask"));
+          }}
+        >
+          {projectName || "Unnamed Project"}
+        </span>
+        <span className="m-[0.3vw]">{"/"}</span>
+        <span className="text-[#3B82F6]">{activetab}</span>
+      </div>
+
+      <div className=" relative flex space-x-[0.5vw] mt-[0.5vw] mb-[0.5vw] bg-white p-[0.4vw] rounded-full w-fit">
+        <NavLink
+          to={`overview`}
+          state={{ projectId, projectName }}
+          end
+          className={({ isActive }) =>
+            `${tabClass} ${isActive ? activeClass : inactiveClass}`
+          }
+        >
+          Overview
+        </NavLink>
+        <NavLink
+          to={`resources`}
+          state={{ projectId, projectName }}
+          className={({ isActive }) =>
+            `${tabClass} ${isActive ? activeClass : inactiveClass}`
+          }
+        >
+          Resources
+        </NavLink>
+      </div>
+
+      <div className="overflow-y-auto h-[80vh] pr-[0.3vw]">
+        <Outlet />
+      </div>
+    </div>
+  );
+};
+
+export default ProjectOverview;
