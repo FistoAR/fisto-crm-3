@@ -26,6 +26,7 @@ const Followup = () => {
   const [subTab, setSubTab] = useState("followup");
   const [clients, setClients] = useState([]);
   const [clientsHistory, setClientsHistory] = useState([]);
+  const [meetings, setMeetings] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [startDate, setStartDate] = useState("");
@@ -96,7 +97,11 @@ const Followup = () => {
     }
 
     fetchTimeoutRef.current = setTimeout(() => {
-      fetchClients();
+      if (mainTab === "meetings") {
+        fetchMeetings();
+      } else {
+        fetchClients();
+      }
     }, 400);
 
     return () => {
@@ -141,6 +146,38 @@ const Followup = () => {
       console.error("Error fetching counts:", error);
     } finally {
       setCountsLoading(false);
+    }
+  };
+
+  const fetchMeetings = async () => {
+    if (!employeeId) {
+      console.log("No employee ID yet, skipping fetch");
+      return;
+    }
+
+    try {
+      const url = `${API_URL}/ManagementFollowups?status=all&employee_id=${employeeId}`;
+      const response = await fetch(url);
+      const data = await response.json();
+
+      if (data.success) {
+        const allMeetings = [];
+        data.data.forEach((clientData) => {
+          if (clientData.meetings && clientData.meetings.length > 0) {
+            clientData.meetings.forEach((meeting) => {
+              allMeetings.push({
+                ...meeting,
+                client_details: clientData.client_details,
+              });
+            });
+          }
+        });
+        setMeetings(allMeetings);
+      }
+    } catch (error) {
+      console.error("Error fetching meetings:", error);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -231,6 +268,31 @@ const Followup = () => {
       fetchCounts();
     } catch (error) {
       console.error("Error restoring client:", error);
+    }
+  };
+
+  const handleUpdateMeetingStatus = async (meetingId, newStatus) => {
+    try {
+      const response = await fetch(
+        `${API_URL}/ManagementFollowups/meetings/${meetingId}/status`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ status: newStatus }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (response.ok) {
+        fetchMeetings();
+      } else {
+        console.error("Failed to update meeting status:", data.error);
+      }
+    } catch (error) {
+      console.error("Error updating meeting status:", error);
     }
   };
 
@@ -441,6 +503,38 @@ const Followup = () => {
     return count;
   };
 
+  const getMeetingStatus = (meetingDate, isCompleted) => {
+    if (isCompleted) {
+      return {
+        label: "Completed",
+        className: "bg-green-100 text-green-700",
+      };
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const meeting = new Date(meetingDate);
+    meeting.setHours(0, 0, 0, 0);
+
+    if (meeting.getTime() === today.getTime()) {
+      return {
+        label: "Today",
+        className: "bg-blue-100 text-blue-700",
+      };
+    } else if (meeting > today) {
+      return {
+        label: "Upcoming",
+        className: "bg-purple-100 text-purple-700",
+      };
+    } else {
+      return {
+        label: "Overdue",
+        className: "bg-red-100 text-red-700",
+      };
+    }
+  };
+
   const getStatusLabel = (status) => {
     if (status === "first_followup") return "In Progress";
     if (status === "not_reachable") return "Not Reachable";
@@ -507,6 +601,17 @@ const Followup = () => {
                 )}
               </span>
             </button>
+            <button   onClick={() => {
+                setMainTab("meetings");
+                setSubTab("meeting");
+              }}
+              className={`px-[1.5vw] cursor-pointer font-medium text-[0.9vw] transition-colors flex items-center gap-[0.4vw] ${
+                mainTab === "meetings"
+                  ? "border-b-2 border-black text-black"
+                  : "text-gray-600 hover:text-gray-900"
+              }`}> 
+              Meetings
+            </button>
           </div>
 
           <div className="w-full h-full flex items-center justify-end pr-[0.3vw] gap-[0.4vw]">
@@ -562,10 +667,10 @@ const Followup = () => {
           <div className="flex items-center justify-between p-[0.8vw] h-[10%] flex-shrink-0">
             <div className="flex items-center gap-[0.5vw]">
               <span className="font-medium text-[0.95vw] text-gray-800">
-                All Clients
+                {mainTab === "meetings" ? "All Meetings" : "All Clients"}
               </span>
               <span className="text-[0.85vw] text-gray-500">
-                ({filteredClients.length})
+                ({mainTab === "meetings" ? meetings.length : filteredClients.length})
               </span>
             </div>
             <div className="flex items-center gap-[0.7vw]">
@@ -584,141 +689,143 @@ const Followup = () => {
                 />
               </div>
 
-              <div className="relative" ref={filterRef}>
-                <button
-                  onClick={() => setShowFilterDropdown(!showFilterDropdown)}
-                  className={`rounded-full hover:bg-gray-100 flex items-center gap-2 text-[0.8vw] px-[0.6vw] py-[0.3vw] text-gray-700 cursor-pointer ${
-                    hasActiveFilters
-                      ? "bg-blue-100 border border-blue-300"
-                      : "bg-gray-200"
-                  }`}
-                >
-                  <img src={filter} alt="" className="w-[1.1vw] h-[1.1vw] " />
-                  Filter
-                  {hasActiveFilters && (
-                    <span className="bg-blue-600 text-white text-[0.6vw] px-[0.4vw] py-[0.05vw] rounded-full flex justify-center items-center">
-                      {activeFilterCount}
-                    </span>
-                  )}
-                </button>
+              {mainTab !== "meetings" && (
+                <div className="relative" ref={filterRef}>
+                  <button
+                    onClick={() => setShowFilterDropdown(!showFilterDropdown)}
+                    className={`rounded-full hover:bg-gray-100 flex items-center gap-2 text-[0.8vw] px-[0.6vw] py-[0.3vw] text-gray-700 cursor-pointer ${
+                      hasActiveFilters
+                        ? "bg-blue-100 border border-blue-300"
+                        : "bg-gray-200"
+                    }`}
+                  >
+                    <img src={filter} alt="" className="w-[1.1vw] h-[1.1vw] " />
+                    Filter
+                    {hasActiveFilters && (
+                      <span className="bg-blue-600 text-white text-[0.6vw] px-[0.4vw] py-[0.05vw] rounded-full flex justify-center items-center">
+                        {activeFilterCount}
+                      </span>
+                    )}
+                  </button>
 
-                {showFilterDropdown && (
-                  <div className="absolute right-0 mt-[0.3vw] w-[16vw] bg-white rounded-lg shadow-lg border border-gray-200 z-50">
-                    <div className="p-[0.8vw]">
-                      <div className="flex items-center justify-between mb-[0.8vw]">
-                        <span className="font-semibold text-[0.85vw]">
-                          Filters
-                        </span>
-                        <button
-                          onClick={() => setShowFilterDropdown(false)}
-                          className="p-[0.2vw] hover:bg-gray-100 rounded-full"
-                        >
-                          <X size={"0.9vw"} className="text-gray-500" />
-                        </button>
-                      </div>
-
-                      <div className="mb-[1vw]">
-                        <label className="block text-[0.75vw] font-medium text-gray-700 mb-[0.3vw]">
-                          Date Range
-                        </label>
-                        <div className="flex flex-col gap-[0.4vw]">
-                          <div className="flex items-center gap-[0.3vw]">
-                            <span className="text-[0.7vw] text-gray-500 w-[2.5vw]">
-                              From:
-                            </span>
-                            <input
-                              type="date"
-                              value={startDate}
-                              onChange={(e) => setStartDate(e.target.value)}
-                              className="flex-1 px-[0.4vw] py-[0.25vw] text-[0.75vw] border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
-                            />
-                          </div>
-                          <div className="flex items-center gap-[0.3vw]">
-                            <span className="text-[0.7vw] text-gray-500 w-[2.5vw]">
-                              To:
-                            </span>
-                            <input
-                              type="date"
-                              value={endDate}
-                              min={startDate}
-                              onChange={(e) => setEndDate(e.target.value)}
-                              className="flex-1 px-[0.4vw] py-[0.25vw] text-[0.75vw] border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
-                              disabled={!startDate}
-                            />
-                          </div>
-                        </div>
-                      </div>
-
-                      {showFollowupFilters && (
-                        <div className="mb-[1vw]">
-                          <label className="block text-[0.75vw] font-medium text-gray-700 mb-[0.3vw]">
-                            Next Followup Date
-                          </label>
-                          <input
-                            type="date"
-                            value={nextFollowupDate}
-                            onChange={(e) =>
-                              setnextFollowupDate(e.target.value)
-                            }
-                            className="w-full px-[0.4vw] py-[0.25vw] text-[0.75vw] border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
-                          />
-                        </div>
-                      )}
-
-                      {showStatusFilter && (
-                        <div className="mb-[1vw]">
-                          <label className="block text-[0.75vw] font-medium text-gray-700 mb-[0.3vw]">
-                            Status
-                          </label>
-                          <select
-                            value={statusFilter}
-                            onChange={(e) => setStatusFilter(e.target.value)}
-                            className="w-full px-[0.4vw] py-[0.25vw] text-[0.75vw] border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                  {showFilterDropdown && (
+                    <div className="absolute right-0 mt-[0.3vw] w-[16vw] bg-white rounded-lg shadow-lg border border-gray-200 z-50">
+                      <div className="p-[0.8vw]">
+                        <div className="flex items-center justify-between mb-[0.8vw]">
+                          <span className="font-semibold text-[0.85vw]">
+                            Filters
+                          </span>
+                          <button
+                            onClick={() => setShowFilterDropdown(false)}
+                            className="p-[0.2vw] hover:bg-gray-100 rounded-full"
                           >
-                            {statusOptions.map((option) => (
-                              <option key={option.value} value={option.value}>
-                                {option.label}
-                              </option>
-                            ))}
-                          </select>
+                            <X size={"0.9vw"} className="text-gray-500" />
+                          </button>
                         </div>
-                      )}
 
-                      {subTab === "followup" && (
-                        <div className="mb-[0.5vw] pt-[0.2vw]">
-                          <label className="flex items-center gap-[0.5vw] cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={showMissedFollowups}
-                              onChange={(e) =>
-                                setShowMissedFollowups(e.target.checked)
-                              }
-                              className="w-[1vw] h-[1vw] cursor-pointer accent-blue-600"
-                            />
-                            <span className="text-[0.75vw] font-medium text-gray-700">
-                              Show Missed Followups Only
-                            </span>
+                        <div className="mb-[1vw]">
+                          <label className="block text-[0.75vw] font-medium text-gray-700 mb-[0.3vw]">
+                            Date Range
                           </label>
+                          <div className="flex flex-col gap-[0.4vw]">
+                            <div className="flex items-center gap-[0.3vw]">
+                              <span className="text-[0.7vw] text-gray-500 w-[2.5vw]">
+                                From:
+                              </span>
+                              <input
+                                type="date"
+                                value={startDate}
+                                onChange={(e) => setStartDate(e.target.value)}
+                                className="flex-1 px-[0.4vw] py-[0.25vw] text-[0.75vw] border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                              />
+                            </div>
+                            <div className="flex items-center gap-[0.3vw]">
+                              <span className="text-[0.7vw] text-gray-500 w-[2.5vw]">
+                                To:
+                              </span>
+                              <input
+                                type="date"
+                                value={endDate}
+                                min={startDate}
+                                onChange={(e) => setEndDate(e.target.value)}
+                                className="flex-1 px-[0.4vw] py-[0.25vw] text-[0.75vw] border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                                disabled={!startDate}
+                              />
+                            </div>
+                          </div>
                         </div>
-                      )}
 
-                      {hasActiveFilters && (
-                        <button
-                          onClick={clearAllFilters}
-                          className="w-full flex items-center justify-center gap-[0.3vw] text-[0.7vw] text-red-600 hover:text-red-700 cursor-pointer mt-[0.7vw] py-[0.4vw] border border-red-200 rounded-lg hover:bg-red-50 transition-colors"
-                        >
-                          <X size={"0.8vw"} />
-                          Clear All Filters
-                        </button>
-                      )}
+                        {showFollowupFilters && (
+                          <div className="mb-[1vw]">
+                            <label className="block text-[0.75vw] font-medium text-gray-700 mb-[0.3vw]">
+                              Next Followup Date
+                            </label>
+                            <input
+                              type="date"
+                              value={nextFollowupDate}
+                              onChange={(e) =>
+                                setnextFollowupDate(e.target.value)
+                              }
+                              className="w-full px-[0.4vw] py-[0.25vw] text-[0.75vw] border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                            />
+                          </div>
+                        )}
+
+                        {showStatusFilter && (
+                          <div className="mb-[1vw]">
+                            <label className="block text-[0.75vw] font-medium text-gray-700 mb-[0.3vw]">
+                              Status
+                            </label>
+                            <select
+                              value={statusFilter}
+                              onChange={(e) => setStatusFilter(e.target.value)}
+                              className="w-full px-[0.4vw] py-[0.25vw] text-[0.75vw] border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                            >
+                              {statusOptions.map((option) => (
+                                <option key={option.value} value={option.value}>
+                                  {option.label}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
+
+                        {subTab === "followup" && (
+                          <div className="mb-[0.5vw] pt-[0.2vw]">
+                            <label className="flex items-center gap-[0.5vw] cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={showMissedFollowups}
+                                onChange={(e) =>
+                                  setShowMissedFollowups(e.target.checked)
+                                }
+                                className="w-[1vw] h-[1vw] cursor-pointer accent-blue-600"
+                              />
+                              <span className="text-[0.75vw] font-medium text-gray-700">
+                                Show Missed Followups Only
+                              </span>
+                            </label>
+                          </div>
+                        )}
+
+                        {hasActiveFilters && (
+                          <button
+                            onClick={clearAllFilters}
+                            className="w-full flex items-center justify-center gap-[0.3vw] text-[0.7vw] text-red-600 hover:text-red-700 cursor-pointer mt-[0.7vw] py-[0.4vw] border border-red-200 rounded-lg hover:bg-red-50 transition-colors"
+                          >
+                            <X size={"0.8vw"} />
+                            Clear All Filters
+                          </button>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                )}
-              </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
-          {hasActiveFilters && (
+          {hasActiveFilters && mainTab !== "meetings" && (
             <div className="flex items-center gap-[0.5vw] px-[0.8vw] pb-[0.5vw] flex-wrap">
               <span className="text-[0.75vw] text-gray-500">
                 Active filters:
@@ -796,6 +903,128 @@ const Followup = () => {
               <div className="flex items-center justify-center h-full min-h-[400px]">
                 <div className="animate-spin rounded-full h-[2vw] w-[2vw] border-b-2 border-blue-600"></div>
               </div>
+            ) : mainTab === "meetings" ? (
+              meetings.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-full min-h-[400px] text-gray-500">
+                  <Calendar className="w-[5vw] h-[5vw] mb-[1vw] text-gray-300" />
+                  <p className="text-[1.1vw] font-medium mb-[0.5vw]">
+                    No meetings found
+                  </p>
+                  <p className="text-[1vw] text-gray-400">
+                    No meetings scheduled yet
+                  </p>
+                </div>
+              ) : (
+                <div className="mr-[0.8vw] mb-[0.8vw] ml-[0.8vw] border border-gray-300 rounded-xl overflow-auto">
+                  <table className="w-full border-collapse border border-gray-300">
+                    <thead className="bg-[#E2EBFF] sticky top-0">
+                      <tr>
+                        <th className="px-[0.7vw] py-[0.5vw] text-center text-[0.9vw] font-medium text-gray-800 border border-gray-300">
+                          S.NO
+                        </th>
+                        <th className="px-[0.7vw] py-[0.5vw] text-center text-[0.9vw] font-medium text-gray-800 border border-gray-300">
+                          Company
+                        </th>
+                        <th className="px-[0.7vw] py-[0.5vw] text-center text-[0.9vw] font-medium text-gray-800 border border-gray-300">
+                          Title
+                        </th>
+                        <th className="px-[0.7vw] py-[0.5vw] text-center text-[0.9vw] font-medium text-gray-800 border border-gray-300">
+                          Date
+                        </th>
+                        <th className="px-[0.7vw] py-[0.5vw] text-center text-[0.9vw] font-medium text-gray-800 border border-gray-300">
+                          Time
+                        </th>
+                        <th className="px-[0.7vw] py-[0.5vw] text-center text-[0.9vw] font-medium text-gray-800 border border-gray-300">
+                          Type
+                        </th>
+                        <th className="px-[0.7vw] py-[0.5vw] text-center text-[0.9vw] font-medium text-gray-800 border border-gray-300">
+                          Agenda
+                        </th>
+                        <th className="px-[0.7vw] py-[0.5vw] text-center text-[0.9vw] font-medium text-gray-800 border border-gray-300">
+                          Status
+                        </th>
+                        <th className="px-[0.7vw] py-[0.5vw] text-center text-[0.9vw] font-medium text-gray-800 border border-gray-300">
+                          Actions
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody ref={tableBodyRef}>
+                      {meetings.map((meeting, index) => (
+                        <tr
+                          key={meeting.id}
+                          className="hover:bg-gray-50 transition-colors"
+                        >
+                          <td className="px-[0.7vw] py-[0.56vw] text-[0.86vw] text-gray-900 border border-gray-300">
+                            {index + 1}
+                          </td>
+                          <td className="px-[0.7vw] py-[0.56vw] text-[0.86vw] text-gray-900 border border-gray-300">
+                            {meeting.client_details?.company_name || "-"}
+                          </td>
+                          <td className="px-[0.7vw] py-[0.56vw] text-[0.86vw] text-gray-900 border border-gray-300">
+                            {meeting.title}
+                          </td>
+                          <td className="px-[0.7vw] py-[0.56vw] text-[0.86vw] text-gray-900 border border-gray-300">
+                            <div className="flex justify-center">
+                              {meeting.date
+                                ? new Date(meeting.date)
+                                    .toLocaleDateString("en-GB")
+                                    .split("/")
+                                    .join("-")
+                                : "-"}
+                            </div>
+                          </td>
+                          <td className="px-[0.7vw] py-[0.56vw] text-[0.86vw] text-gray-900 border border-gray-300">
+                            {meeting.time || "-"}
+                          </td>
+                          <td className="px-[0.7vw] py-[0.56vw] text-[0.86vw] text-gray-900 border border-gray-300">
+                            {meeting.type || "-"}
+                          </td>
+                          <td className="px-[0.7vw] py-[0.56vw] text-[0.86vw] text-gray-600 border border-gray-300 max-w-[12vw]">
+                            <div className="line-clamp-2" title={meeting.agenda}>
+                              {meeting.agenda || "-"}
+                            </div>
+                          </td>
+                          <td className="px-[0.7vw] py-[0.56vw] text-[0.86vw] border border-gray-300">
+                            <div className="flex justify-center">
+                              {(() => {
+                                const status = getMeetingStatus(
+                                  meeting.date,
+                                  meeting.status === "completed"
+                                );
+                                return (
+                                  <span
+                                    className={`px-[0.5vw] py-[0.2vw] rounded-full text-[0.78vw] font-medium ${status.className}`}
+                                  >
+                                    {status.label}
+                                  </span>
+                                );
+                              })()}
+                            </div>
+                          </td>
+                          <td className="px-[0.7vw] py-[0.52vw] border border-gray-300">
+                            <div className="flex justify-center gap-[0.3vw]">
+                              {meeting.status !== "completed" && (
+                                <button
+                                  onClick={() =>
+                                    handleUpdateMeetingStatus(
+                                      meeting.id,
+                                      "completed"
+                                    )
+                                  }
+                                  className="px-[0.6vw] py-[0.3vw] bg-green-600 text-white rounded-full text-[0.78vw] hover:bg-green-700 cursor-pointer"
+                                  title="Mark as Completed"
+                                >
+                                  Mark Completed
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )
             ) : filteredClients.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full min-h-[400px] text-gray-500">
                 <svg
@@ -977,12 +1206,12 @@ const Followup = () => {
             )}
           </div>
 
-          {!loading && filteredClients.length > 0 && (
+          {!loading && ((mainTab === "meetings" && meetings.length > 0) || (mainTab !== "meetings" && filteredClients.length > 0)) && (
             <div className="flex items-center justify-between px-[0.8vw] py-[0.5vw] h-[10%]">
               <div className="text-[0.85vw] text-gray-600">
                 Showing {startIndex + 1} to{" "}
-                {Math.min(endIndex, filteredClients.length)} of{" "}
-                {filteredClients.length} entries
+                {Math.min(endIndex, mainTab === "meetings" ? meetings.length : filteredClients.length)} of{" "}
+                {mainTab === "meetings" ? meetings.length : filteredClients.length} entries
               </div>
               <div className="flex items-center gap-[0.5vw]">
                 <button

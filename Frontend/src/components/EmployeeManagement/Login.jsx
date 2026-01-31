@@ -143,6 +143,10 @@ const LoginPage = () => {
         navigate("/designer");
         break;
 
+      case "SBU":
+        navigate("/sbu");
+        break;
+
 
       default:
         navigate("/management");

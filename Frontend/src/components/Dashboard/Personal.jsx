@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 
 // --- SVG ICON COMPONENTS ---
@@ -40,9 +40,15 @@ const MessageSquareIcon = ({ className }) => (
     <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
   </Icon>
 );
-const StarIcon = ({ className }) => (
-  <Icon className={className} fill="currentColor">
-    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+const QuoteIcon = ({ className }) => (
+  <Icon className={className}>
+    <path d="M3 21c3 0 7-1 7-8V5c0-1.25-.756-2.017-2-2H4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .008-1 1.031V20c0 1 0 1 1 1z"></path>
+    <path d="M15 21c3 0 7-1 7-8V5c0-1.25-.757-2.017-2-2h-4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2h.75c0 2.25.25 4-2.75 4v3c0 1 0 1 1 1z"></path>
+  </Icon>
+);
+const SparkleIcon = ({ className }) => (
+  <Icon className={className}>
+    <path d="m12 3-1.9 5.8a2 2 0 0 1-1.287 1.288L3 12l5.8 1.9a2 2 0 0 1 1.288 1.287L12 21l1.9-5.8a2 2 0 0 1 1.287-1.288L21 12l-5.8-1.9a2 2 0 0 1-1.288-1.287Z"></path>
   </Icon>
 );
 
@@ -86,27 +92,6 @@ const statsDataConfig = [
   },
 ];
 
-// --- HELPERS ---
-const getInitials = (name) => {
-  if (!name) return "??";
-  return name
-    .split(" ")
-    .map((n) => n[0])
-    .join("")
-    .substring(0, 2)
-    .toUpperCase();
-};
-const avatarColors = [
-  "bg-pink-200 text-pink-800",
-  "bg-orange-200 text-orange-800",
-  "bg-purple-200 text-purple-800",
-  "bg-green-200 text-green-800",
-  "bg-blue-200 text-blue-800",
-  "bg-yellow-200 text-yellow-800",
-];
-
-// --- COMPONENTS ---
-
 const StatCard = ({ value, label, color, iconSrc, iconAlt }) => (
   <div className="bg-white rounded-lg shadow-sm flex flex-col justify-center px-[0.8vw] py-[0.7vw] gap-[0.5vw] w-[16%] h-full">
     <div className="flex items-center justify-between">
@@ -117,263 +102,14 @@ const StatCard = ({ value, label, color, iconSrc, iconAlt }) => (
   </div>
 );
 
-const TodayTasksCard = ({
-  tasks = [],
-  loading,
-  apiBaseUrl,
-  unscheduledTask = [],
-  dayTask = [],
-  employees = [],
-}) => {
+const TodayTasksCard = () => {
   const [todaysWorkItems, setTodaysWorkItems] = useState([]);
-  const [employeeCache, setEmployeeCache] = useState({});
-  const [loadingEmployees, setLoadingEmployees] = useState(false);
   const [imageErrors, setImageErrors] = useState({});
   const [hoveredTask, setHoveredTask] = useState(null);
-
-  const fetchEmployeeData = async (employeeId) => {
-    if (employeeCache[employeeId]) return employeeCache[employeeId];
-    try {
-      const response = await fetch(`${apiBaseUrl}/Profile/${employeeId}`);
-      if (!response.ok) return null;
-      const data = await response.json();
-      const employeeData = data?.data || data;
-      setEmployeeCache((prev) => ({ ...prev, [employeeId]: employeeData }));
-      return employeeData;
-    } catch (error) {
-      return null;
-    }
-  };
 
   const handleImageError = (itemId) => {
     setImageErrors((prev) => ({ ...prev, [itemId]: true }));
   };
-
-  const isToday = (dateString) => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const checkDate = new Date(dateString + "T00:00:00");
-    return checkDate.getTime() === today.getTime();
-  };
-
-  useEffect(() => {
-    const loadTodaysTasks = async () => {
-      if (loading) {
-        setTodaysWorkItems([]);
-        return;
-      }
-
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const allWorkItems = [];
-      const employeesWithTasks = new Set();
-
-      // Priority 1: Day Task (if reported today)
-      (dayTask || []).forEach((day) => {
-        if (isToday(day.createdAt?.split("T")[0] || "")) {
-          employeesWithTasks.add(day.employeeID);
-          
-          const taskName = day.activityDetails 
-            ? day.activityDetails.activityName 
-            : day.taskDetails 
-              ? day.taskDetails.taskName 
-              : "Day Report";
-
-          allWorkItems.push({
-            id: day._id?.$oid || Math.random(),
-            type: "dayTask",
-            taskName: taskName,
-            activityName: day.activityDetails?.activityName || null,
-            description: day.activityDetails?.description || day.taskDetails?.description || "Daily task report submitted",
-            employeeId: day.employeeID,
-            endDate: day.endDate || new Date().toISOString().split("T")[0],
-            status: "Completed",
-            priority: 1,
-            projectName: day.projectName || "",
-            startDate: day.startDate || "",
-            startTime: day.startTime || "",
-            endTime: day.endTime || "",
-          });
-        }
-      });
-
-      // Priority 2: Unscheduled Task (if created today)
-      (unscheduledTask || []).forEach((unscheduled) => {
-        if (isToday(unscheduled.createdAt?.split("T")[0] || "")) {
-          employeesWithTasks.add(unscheduled.employeeID);
-          allWorkItems.push({
-            id: unscheduled._id?.$oid || Math.random(),
-            type: "unscheduled",
-            taskName: unscheduled.taskName || "Unscheduled Task",
-            activityName: null,
-            description: unscheduled.reports || unscheduled.outcomes || "",
-            employeeId: unscheduled.employeeID,
-            endDate: new Date().toISOString().split("T")[0],
-            status: unscheduled.status || "In Progress",
-            priority: 2,
-            projectName: unscheduled.projectName || "",
-            startDate: "",
-            startTime: unscheduled.startTime || "",
-            endTime: unscheduled.endTime || "",
-          });
-        }
-      });
-
-      // Priority 3: Scheduled Tasks/Activities (only if scheduled for today)
-      (tasks || []).forEach((task) => {
-        const hasActivities = task.activities && task.activities.length > 0;
-
-        if (!hasActivities) {
-          const taskEmployee = task.employee;
-          if (taskEmployee && taskEmployee.trim() !== "") {
-            if (task.startDate && task.endDate) {
-              const taskStartDate = new Date(task.startDate + "T00:00:00");
-              const taskEndDate = new Date(task.endDate + "T23:59:59");
-
-              if (today >= taskStartDate && today <= taskEndDate) {
-                employeesWithTasks.add(taskEmployee);
-                allWorkItems.push({
-                  id: task._id?.$oid || Math.random(),
-                  type: "task",
-                  taskName: task.taskName,
-                  activityName: null,
-                  description: task.description,
-                  employeeId: taskEmployee,
-                  endDate: task.endDate,
-                  status: task.status,
-                  priority: 3,
-                  isActivity: false,
-                  projectName: task.projectName || "",
-                  startDate: task.startDate,
-                  startTime: task.startTime || "",
-                  endTime: task.endTime || "",
-                });
-              }
-            }
-          }
-        } else {
-          task.activities.forEach((activity) => {
-            if (activity.startDate && activity.endDate && activity.employee) {
-              const activityStartDate = new Date(activity.startDate + "T00:00:00");
-              const activityEndDate = new Date(activity.endDate + "T23:59:59");
-
-              if (today >= activityStartDate && today <= activityEndDate) {
-                employeesWithTasks.add(activity.employee);
-                allWorkItems.push({
-                  id: activity._id?.$oid || Math.random(),
-                  type: "activity",
-                  taskName: task.taskName,
-                  activityName: activity.activityName,
-                  description: activity.description,
-                  employeeId: activity.employee,
-                  endDate: activity.endDate,
-                  status: activity.status,
-                  priority: 3,
-                  isActivity: true,
-                  projectName: task.projectName || "",
-                  startDate: activity.startDate,
-                  startTime: activity.startTime || "",
-                  endTime: activity.endTime || "",
-                });
-              }
-            }
-          });
-        }
-      });
-
-      // Add employees without tasks
-      (employees || []).forEach((employee) => {
-        const empId = employee._id?.$oid || employee._id?.toString();
-        if (!employeesWithTasks.has(empId)) {
-          allWorkItems.push({
-            id: `no-task-${empId}`,
-            type: "noTask",
-            taskName: "No Task",
-            activityName: null,
-            description: "No task scheduled or assigned today",
-            employeeId: empId,
-            endDate: new Date().toISOString().split("T")[0],
-            status: "No Task",
-            priority: 4,
-            projectName: "",
-            startDate: "",
-            startTime: "",
-            endTime: "",
-          });
-        }
-      });
-
-      // Sort by priority
-      allWorkItems.sort((a, b) => a.priority - b.priority);
-
-      // Group by employee and find their highest priority type
-      const employeeTasksMap = new Map();
-      allWorkItems.forEach((item) => {
-        if (!employeeTasksMap.has(item.employeeId)) {
-          employeeTasksMap.set(item.employeeId, []);
-        }
-        employeeTasksMap.get(item.employeeId).push(item);
-      });
-
-      // For each employee, keep only tasks of the highest priority type
-      const filteredWorkItems = [];
-      employeeTasksMap.forEach((items, employeeId) => {
-        // Find the highest priority (lowest number)
-        const highestPriority = Math.min(...items.map(item => item.priority));
-        
-        // Keep all tasks that match the highest priority
-        const tasksToShow = items.filter(item => item.priority === highestPriority);
-        
-        filteredWorkItems.push(...tasksToShow);
-      });
-
-      // Sort final list by priority again
-      filteredWorkItems.sort((a, b) => a.priority - b.priority);
-
-      if (filteredWorkItems.length > 0) {
-        setLoadingEmployees(true);
-        const displayItems = await Promise.all(
-          filteredWorkItems.map(async (item, index) => {
-            const employee = await fetchEmployeeData(item.employeeId);
-            const formattedEndDate = new Date(item.endDate)
-              .toLocaleDateString("en-GB", {
-                day: "2-digit",
-                month: "2-digit",
-                year: "numeric",
-              })
-              .replace(/\//g, "-");
-
-            return {
-              id: item.id,
-              type: item.type,
-              taskName: item.taskName,
-              activityName: item.activityName,
-              description: item.description,
-              employeeName: employee ? employee.employeeName : "Unassigned",
-              endDate: formattedEndDate,
-              avatar: employee && employee.profile ? `${apiBaseUrl}${employee.profile}` : null,
-              initials: employee ? getInitials(employee.employeeName) : "?",
-              color: avatarColors[index % avatarColors.length],
-              status: item.status,
-              isActivity: item.isActivity,
-              priority: item.priority,
-              projectName: item.projectName,
-              startDate: item.startDate,
-              startTime: item.startTime,
-              endTime: item.endTime,
-            };
-          })
-        );
-        setTodaysWorkItems(displayItems);
-        setLoadingEmployees(false);
-        setImageErrors({});
-      } else {
-        setTodaysWorkItems([]);
-      }
-    };
-
-    loadTodaysTasks();
-  }, [tasks, loading, apiBaseUrl, unscheduledTask, dayTask, JSON.stringify(employees)]);
 
   const getTypeLabel = (type) => {
     switch (type) {
@@ -393,18 +129,10 @@ const TodayTasksCard = ({
   };
 
   const renderTaskList = () => {
-    if (loading || loadingEmployees) {
-      return (
-        <div style={{ padding: "1.04vw", textAlign: "center", color: "#6B7280" }}>
-          Loading tasks...
-        </div>
-      );
-    }
-
     if (todaysWorkItems.length === 0) {
       return (
         <div style={{ padding: "1.04vw", textAlign: "center", color: "#6B7280" }}>
-          No employees found.
+          No tasks available
         </div>
       );
     }
@@ -535,12 +263,11 @@ const TodayTasksCard = ({
                 </div>
               )}
 
-              
-            {item.isActivity && item.activityName && (
-              <div style={{ fontSize: "0.68vw", color: "#ffffff", marginBottom: "0.1vw" }}>
-                <strong>{isNoTask ? "" : "Task:"}</strong> {item.taskName}
-              </div>
-            )}
+              {item.isActivity && item.activityName && (
+                <div style={{ fontSize: "0.68vw", color: "#ffffff", marginBottom: "0.1vw" }}>
+                  <strong>{isNoTask ? "" : "Task:"}</strong> {item.taskName}
+                </div>
+              )}
               {item.startDate && (
                 <div style={{ marginBottom: "0.26vw" }}>
                   <strong>Start Date:</strong> {formatDate(item.startDate)}
@@ -566,7 +293,9 @@ const TodayTasksCard = ({
         backgroundColor: "white",
         borderRadius: "0.9vw",
         boxShadow: "0 0.05vw 0.16vw rgba(0, 0, 0, 0.1)",
-        height: "100%",}} className="overflow-hidden"
+        height: "100%",
+      }}
+      className="overflow-hidden"
     >
       <div
         style={{
@@ -581,7 +310,7 @@ const TodayTasksCard = ({
       </div>
       <div
         style={{ borderRadius: "0 0 0.42vw 0.42vw" }}
-        className=" overflow-y-auto min-h-0 max-h-[90%] bg-white text-gray-700"
+        className="overflow-y-auto min-h-0 max-h-[90%] bg-white text-gray-700"
       >
         {renderTaskList()}
       </div>
@@ -589,59 +318,37 @@ const TodayTasksCard = ({
   );
 };
 
-const CelebrationsCard = ({
-  employees = [],
-  events = [],
-  loading,
-  apiBaseUrl,
-}) => {
+const CelebrationsCard = () => {
   const [celebrations, setCelebrations] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
+  const API_URL = import.meta.env.VITE_API_BASE_URL;
 
+  // Fetch today's celebrations
   useEffect(() => {
-    if (loading || !apiBaseUrl) {
-      setCelebrations([]);
-      return;
-    }
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const fetchTodayCelebrations = async () => {
+      try {
+        setLoading(true);
+        const response = await fetch(`${API_URL}/celebrations/today`);
+        const data = await response.json();
+        
+        if (data.status && data.celebrations) {
+          setCelebrations(data.celebrations);
+        } else {
+          setCelebrations([]);
+        }
+      } catch (error) {
+        console.error("Error fetching celebrations:", error);
+        setCelebrations([]);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-    const birthdaysToday = (employees || [])
-      .filter((emp) => {
-        if (!emp.dob) return false;
-        const dobDate = new Date(emp.dob);
-        return (
-          dobDate.getMonth() === today.getMonth() &&
-          dobDate.getDate() === today.getDate()
-        );
-      })
-      .map((emp) => ({
-        id: emp._id?.$oid || emp.emailId,
-        type: "birthday",
-        title: emp.employeeName,
-        avatar: emp.profile ? `${apiBaseUrl}${emp.profile}` : null,
-        initials: getInitials(emp.employeeName),
-      }));
+    fetchTodayCelebrations();
+  }, [API_URL]);
 
-    const specialDaysToday = (events || [])
-      .filter((event) => {
-        if (event.eventtype !== "Special day" || !event.date) return false;
-        const startDate = new Date(event.date + "T00:00:00");
-        const endDate = event.endDate
-          ? new Date(event.endDate + "T23:59:59")
-          : startDate;
-        return today >= startDate && today <= endDate;
-      })
-      .map((event) => ({
-        id: event._id?.$oid || event.title,
-        type: "special_day",
-        title: event.title,
-        description: event.agenda,
-      }));
-
-    setCelebrations([...birthdaysToday, ...specialDaysToday]);
-  }, [employees, events, loading, apiBaseUrl]);
-
+  // Auto-rotate celebration items
   useEffect(() => {
     if (celebrations.length > 1) {
       const interval = setInterval(
@@ -659,166 +366,201 @@ const CelebrationsCard = ({
       (prev) => (prev - 1 + celebrations.length) % celebrations.length
     );
 
-  if (loading)
+  // Get occasion color
+  const getOccasionColor = (occasion) => {
+    switch (occasion) {
+      case "Birthday":
+        return { 
+          bg: "bg-gradient-to-br from-red-50 to-pink-50", 
+          text: "text-red-600", 
+          border: "border-red-200", 
+          badge: "bg-red-100 text-red-800"
+        };
+      case "Work Anniversary":
+        return { 
+          bg: "bg-gradient-to-br from-indigo-50 to-purple-50", 
+          text: "text-indigo-600", 
+          border: "border-indigo-200", 
+          badge: "bg-indigo-100 text-indigo-800"
+        };
+      case "Holiday":
+        return { 
+          bg: "bg-gradient-to-br from-blue-50 to-cyan-50", 
+          text: "text-blue-600", 
+          border: "border-blue-200", 
+          badge: "bg-blue-100 text-blue-800"
+        };
+      case "Special Day":
+      case "Celebration":
+        return { 
+          bg: "bg-gradient-to-br from-yellow-50 to-orange-50", 
+          text: "text-yellow-600", 
+          border: "border-yellow-200", 
+          badge: "bg-yellow-100 text-yellow-800"
+        };
+      default:
+        return { 
+          bg: "bg-gradient-to-br from-gray-50 to-slate-50", 
+          text: "text-gray-600", 
+          border: "border-gray-200", 
+          badge: "bg-gray-100 text-gray-800"
+        };
+    }
+  };
+
+  // Format date
+  const formatDate = (dateString) => {
+    if (!dateString) return "";
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-GB', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric'
+    });
+  };
+
+  if (loading) {
     return (
-      <div className="bg-white p-[1vw] rounded-xl shadow-sm h-full flex items-center justify-center">
-        <p className="text-gray-500 text-[0.8vw]">Loading...</p>
+      <div className="bg-white rounded-xl shadow-sm h-full flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
       </div>
     );
-  if (celebrations.length === 0)
+  }
+
+  if (celebrations.length === 0) {
     return (
-      <div className="bg-white p-[1vw] rounded-xl shadow-sm h-full flex justify-between items-start">
-        <div className="flex flex-col gap-[0.5vw]">
-          <div className="flex items-center gap-[0.5vw]">
-            <CalendarIcon className="w-[1.3vw] h-[1.3vw] text-blue-500" />
-            <span className="text-blue-500 font-bold text-[0.9vw]">
-              Celebrations
-            </span>
-          </div>
-          <p className="text-gray-500 font-medium text-[0.85vw]">
-            No celebrations today.
-          </p>
+      <div className="bg-white rounded-xl shadow-sm h-full flex flex-col items-center justify-center p-4">
+        <div className="w-12 h-12 mb-3 text-gray-400">
+          <SparkleIcon className="w-full h-full" />
         </div>
-        <div className="w-[4vw] h-[4vw] opacity-80">
-          <img
-            src="https://cdn-icons-png.flaticon.com/512/2617/2617978.png"
-            alt="None"
-            className="w-full h-full object-contain"
-          />
-        </div>
+        <h3 className="font-bold text-gray-700 mb-1">No Celebrations Today</h3>
       </div>
     );
+  }
 
   const item = celebrations[currentIndex];
-  const isBirthday = item.type === "birthday";
+  const colors = getOccasionColor(item.occasion);
+  const API_URL1 = import.meta.env.VITE_API_BASE_URL1;
+  const imageUrl = item.imageUrl?.startsWith("http") ? item.imageUrl : `${API_URL1}${item.imageUrl}`;
 
   return (
-    <div className="bg-white p-[1vw] rounded-xl shadow-sm h-full flex flex-col justify-start relative overflow-hidden group">
-      <div className="flex justify-between items-start w-full">
-        <div className="flex flex-col gap-[0.5vw] w-full z-10 flex-1 min-w-0 mr-2">
-          <div className="flex  gap-[0.5vw]">
-            {isBirthday ? (
-              <CalendarIcon className="w-[1.2vw] h-[1.2vw] text-red-500" />
-            ) : (
-              <StarIcon className="w-[1.2vw] h-[1.2vw] text-yellow-500" />
-            )}
-            <span
-              className={`font-bold text-[0.9vw] ${
-                isBirthday ? "text-red-500" : "text-yellow-600"
-              }`}
-            >
-              {isBirthday ? "Happy Birthday!" : "Special Day!"}
-            </span>
+<div className={`${colors.bg} rounded-xl shadow-sm h-full relative overflow-hidden group`}>
+  {/* Navigation Arrows */}
+  {celebrations.length > 1 && (
+    <>
+      <button
+        onClick={handlePrev}
+        className="absolute left-2 top-1/2 -translate-y-1/2 z-10 p-1.5 bg-white/80 rounded-full opacity-0 group-hover:opacity-100 transition-all hover:bg-white shadow-md"
+      >
+        <ChevronLeftIcon className="w-3.5 h-3.5 text-gray-700" />
+      </button>
+      <button
+        onClick={handleNext}
+        className="absolute right-2 top-1/2 -translate-y-1/2 z-10 p-1.5 bg-white/80 rounded-full opacity-0 group-hover:opacity-100 transition-all hover:bg-white shadow-md"
+      >
+        <ChevronRightIcon className="w-3.5 h-3.5 text-gray-700" />
+      </button>
+    </>
+  )}
+
+  {/* Celebration Content */}
+  <div className="h-full p-4 flex flex-col lg:flex-row gap-4">
+    {/* Left Side - ONLY Image */}
+    <div className="lg:w-2/5">
+      <div className="relative h-full rounded-xl overflow-hidden shadow-md">
+        <img
+          src={imageUrl}
+          alt={item.occasion || "Celebration"}
+          className="w-full h-full object-cover"
+          onError={(e) => {
+            e.target.onerror = null;
+            e.target.src = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236B7280'%3E%3Crect x='3' y='4' width='18' height='18' rx='2' ry='2'%3E%3C/rect%3E%3Cline x1='16' y1='2' x2='16' y2='6'%3E%3C/line%3E%3Cline x1='8' y1='2' x2='8' y2='6'%3E%3C/line%3E%3Cline x1='3' y1='10' x2='21' y2='10'%3E%3C/line%3E%3C/svg%3E`;
+          }}
+        />
+      </div>
+    </div>
+
+    {/* Right Side - ALL other content */}
+    <div className="lg:w-3/5 flex flex-col">
+      {/* Header with Occasion and Date */}
+      <div className="mb-3">
+        <h2 className={`text-sm font-semibold ${colors.text} mb-1`}>
+          {item.occasion}
+        </h2>
+        <div className="flex items-center gap-1 text-xs text-gray-500">
+          <CalendarIcon className="w-3 h-3" />
+          <span>{formatDate(item.date)}</span>
+        </div>
+      </div>
+
+      {/* Quote Section */}
+      <div className="flex-1 flex flex-col">
+        {/* Quote Icon */}
+        <div className="mb-2 flex items-center gap-1.5">
+          <QuoteIcon className={`w-4 h-4 ${colors.text}`} />
+          <span className={`text-xs font-medium ${colors.text}`}>Quote</span>
+        </div>
+
+        {/* Quote Text */}
+        <div className="flex-1">
+          <div className="relative p-3 rounded-lg bg-white/70 border ${colors.border}">
+            <p className="text-xs text-gray-800 leading-relaxed italic">
+              {item.quote || item.description}
+            </p>
           </div>
 
-          <div className="flex gap-[1vw] mt-[1vw]">
-            {isBirthday &&
-              (item.avatar ? (
-                <div className="relative w-[3vw] h-[3vw]">
-                  <img
-                    src={item.avatar}
-                    alt={item.title}
-                    className="w-full h-full rounded-full object-cover border-2 border-blue-100"
-                    onError={(e) => {
-                      e.target.style.display = "none";
-                      e.target.nextSibling.style.display = "flex";
-                    }}
-                  />
-                  <div className="hidden absolute  inset-0 bg-blue-500 text-white rounded-full flex items-center justify-center font-medium text-[1.2vw]">
-                    {item.initials || "?"}
-                  </div>
-                </div>
-              ) : (
-                <div
-                  className={`w-[3vw] h-[3vw]  rounded-full flex items-center justify-center text-[1.2vw] font-bold bg-blue-100 text-blue-700`}
-                >
-                  {item.initials}
-                </div>
-              ))}
-            {isBirthday ? (
-              <p className="text-gray-700 font-medium text-[0.85vw] ">
-                Wishing you a wonderful day, <br />
-                <span className="font-semibold text-gray-900 text-[0.95vw]">
-                  {item.title}!
-                </span>
-              </p>
-            ) : (
-              <div className="flex justify-between items-center w-full">
-                <div>
-                  <p className="font-semibold text-gray-900 text-[0.95vw] max-w-[17vw] leading-tight truncate">
-                    {item.title}
-                  </p>
-                  <p className="text-gray-600 font-medium text-[0.8vw] max-w-[17vw] leading-tight mt-1 line-clamp-2">
-                    {item.description}
-                  </p>
-                </div>
-
-                <div className="w-[4vw] h-[4vw] rounded-full flex items-center justify-center bg-yellow-100">
-                  <StarIcon className="w-[2vw] h-[2vw] text-yellow-500" />
-                </div>
-              </div>
-            )}
+          {/* Decorative Elements */}
+          <div className="flex items-center gap-1 mt-3">
+            <div className="flex-1 h-px bg-gradient-to-r from-transparent via-gray-300 to-transparent"></div>
+            <div className="w-1 h-1 rounded-full bg-gray-400"></div>
+            <div className="flex-1 h-px bg-gradient-to-r from-transparent via-gray-300 to-transparent"></div>
           </div>
         </div>
       </div>
-      {celebrations.length > 1 && (
-        <>
-          <button
-            onClick={handlePrev}
-            className="absolute left-1 top-1/2 -translate-y-1/2 z-20 p-1 bg-white/80 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-white shadow-sm"
-          >
-            <ChevronLeftIcon className="w-[1vw] h-[1vw] text-gray-700" />
-          </button>
-          <button
-            onClick={handleNext}
-            className="absolute right-1 top-1/2 -translate-y-1/2 z-20 p-1 bg-white/80 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-white shadow-sm"
-          >
-            <ChevronRightIcon className="w-[1vw] h-[1vw] text-gray-700" />
-          </button>
-          <div className="absolute bottom-1 left-1/2 -translate-x-1/2 flex gap-1 z-20">
-            {celebrations.map((_, idx) => (
-              <div
-                key={idx}
-                className={`w-[0.4vw] h-[0.4vw] rounded-full transition-colors ${
-                  idx === currentIndex ? "bg-blue-600" : "bg-gray-300"
-                }`}
-              />
-            ))}
+
+      {/* Footer Info */}
+      <div className="mt-3 pt-2 border-t border-gray-200">
+        <div className="flex items-center justify-between text-xs">
+          <div className="flex items-center gap-1">
+            <div className={`w-1.5 h-1.5 rounded-full ${colors.badge.split(' ')[0]}`}></div>
+            <span className="text-gray-600">Today's Celebration</span>
           </div>
-        </>
-      )}
+          <div className="flex items-center gap-1">
+            <SparkleIcon className="w-3 h-3 text-yellow-500" />
+            <span className="text-gray-600">#{currentIndex + 1} of {celebrations.length}</span>
+          </div>
+        </div>
+      </div>
     </div>
+  </div>
+
+  {/* Bottom Indicators */}
+  {celebrations.length > 1 && (
+    <div className="px-4 pb-2">
+      <div className="flex items-center justify-center gap-1">
+        {celebrations.map((_, idx) => (
+          <button
+            key={idx}
+            onClick={() => setCurrentIndex(idx)}
+            className={`transition-all duration-300 ${
+              idx === currentIndex 
+                ? `w-5 h-1 rounded-full ${colors.badge.split(' ')[0]}` 
+                : "w-1 h-1 rounded-full bg-gray-300 hover:bg-gray-400"
+            }`}
+            aria-label={`Go to celebration ${idx + 1}`}
+          />
+        ))}
+      </div>
+    </div>
+  )}
+</div>
   );
 };
 
-const AnnouncementCard = ({ allEvents = [], isLoading, apiError }) => {
+const AnnouncementCard = () => {
   const [todaysAnnouncements, setTodaysAnnouncements] = useState([]);
 
-  useEffect(() => {
-    if (isLoading) {
-      setTodaysAnnouncements([]);
-      return;
-    }
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const activeAnnouncements = (allEvents || []).filter((event) => {
-      if (event.eventtype !== "Announcement" || !event.date) return false;
-      const startDate = new Date(event.date + "T00:00:00");
-      const endDate = event.endDate
-        ? new Date(event.endDate + "T23:59:59")
-        : startDate;
-      return today >= startDate && today <= endDate;
-    });
-    setTodaysAnnouncements(activeAnnouncements);
-  }, [allEvents, isLoading]);
-
   const renderList = () => {
-    if (isLoading)
-      return (
-        <div className="flex items-center justify-center h-full text-gray-500 text-[0.8vw]">
-          Loading...
-        </div>
-      );
     if (todaysAnnouncements.length === 0)
       return (
         <div className="flex items-center justify-center h-full text-gray-500 text-[0.8vw]">
@@ -828,7 +570,7 @@ const AnnouncementCard = ({ allEvents = [], isLoading, apiError }) => {
 
     return todaysAnnouncements.map((item) => (
       <div
-        key={item._id.$oid}
+        key={item._id?.$oid || item.id}
         className="bg-blue-50 p-[0.8vw] rounded-lg flex items-start gap-[0.8vw]"
       >
         <svg
@@ -869,23 +611,15 @@ const AnnouncementCard = ({ allEvents = [], isLoading, apiError }) => {
   );
 };
 
-const MeetingsCard = ({
-  allEvents = [],
-  isLoading: parentLoading,
-  apiError,
-}) => {
+const MeetingsCard = () => {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [weekViewDates, setWeekViewDates] = useState([]);
   const [filteredMeetings, setFilteredMeetings] = useState([]);
   const [hoveredMeeting, setHoveredMeeting] = useState(null);
   const [attendeeNames, setAttendeeNames] = useState({});
-  const [loadingAttendees, setLoadingAttendees] = useState({});
   const [tooltipPosition, setTooltipPosition] = useState({ top: 0, left: 0 });
   const meetingRefs = useRef({});
 
-  const API_BASE =
-    import.meta.env.VITE_API_BASE_URL ||
-    "https://hcxqp38j-5000.inc1.devtunnels.ms";
   const monthYearString = selectedDate
     .toLocaleString("default", { month: "long", year: "numeric" })
     .toUpperCase();
@@ -896,7 +630,6 @@ const MeetingsCard = ({
     d1.getDate() === d2.getDate();
 
   useEffect(() => {
-    const meetings = allEvents.filter((e) => e.eventtype === "Meeting");
     const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
     const dates = [];
     for (let i = -3; i <= 3; i++) {
@@ -913,7 +646,7 @@ const MeetingsCard = ({
     const selectedDay = new Date(selectedDate);
     selectedDay.setHours(0, 0, 0, 0);
 
-    const meetingsForDay = meetings.filter((m) => {
+    const meetingsForDay = filteredMeetings.filter((m) => {
       if (!m.date) return false;
       const start = new Date(m.date + "T00:00:00");
       const end = m.endDate ? new Date(m.endDate + "T23:59:59") : start;
@@ -921,41 +654,23 @@ const MeetingsCard = ({
     });
 
     setFilteredMeetings(meetingsForDay);
-  }, [selectedDate, allEvents]);
+  }, [selectedDate]);
 
-  const fetchAttendees = async (meetingId, employeeIds) => {
-    if (!employeeIds || employeeIds.length === 0) {
-      setAttendeeNames((prev) => ({ ...prev, [meetingId]: ["No attendees"] }));
-      return;
-    }
-    if (attendeeNames[meetingId]) return;
-
-    setLoadingAttendees((prev) => ({ ...prev, [meetingId]: true }));
-
-    try {
-      const responses = await Promise.all(
-        employeeIds.map((id) =>
-          fetch(`${API_BASE}/Profile/${id}`)
-            .then((r) => (r.ok ? r.json() : null))
-            .catch(() => null)
-        )
-      );
-
-      const names = responses
-        .map((emp) => emp?.data?.employeeName)
-        .filter(Boolean)
-        .sort();
-
-      setAttendeeNames((prev) => ({
-        ...prev,
-        [meetingId]: names.length > 0 ? names : ["Unknown"],
-      }));
-    } catch (err) {
-      console.error("Failed to load attendees:", err);
-      setAttendeeNames((prev) => ({ ...prev, [meetingId]: ["Error loading"] }));
-    } finally {
-      setLoadingAttendees((prev) => ({ ...prev, [meetingId]: false }));
-    }
+  const getAttendeeNames = (employeeIds) => {
+    const placeholderEmployees = [
+      { _id: "1", employeeName: "John Smith" },
+      { _id: "2", employeeName: "Sarah Johnson" },
+      { _id: "3", employeeName: "Mike Wilson" },
+      { _id: "4", employeeName: "Emily Davis" },
+      { _id: "5", employeeName: "David Brown" },
+    ];
+    
+    return employeeIds
+      .map((id) => {
+        const emp = placeholderEmployees.find((e) => e._id === id);
+        return emp ? emp.employeeName : "Unknown";
+      })
+      .sort();
   };
 
   const handleMouseEnter = (meetingId, employeeIds) => {
@@ -969,7 +684,11 @@ const MeetingsCard = ({
       });
     }
     if (employeeIds.length > 0 && !attendeeNames[meetingId]) {
-      fetchAttendees(meetingId, employeeIds);
+      const names = getAttendeeNames(employeeIds);
+      setAttendeeNames((prev) => ({
+        ...prev,
+        [meetingId]: names.length > 0 ? names : ["Unknown"],
+      }));
     }
   };
 
@@ -1021,15 +740,11 @@ const MeetingsCard = ({
         <div className="font-semibold text-gray-300 text-[0.9vw] mb-[0.4vw]">
           Attendees
         </div>
-        {loadingAttendees[meetingId] ? (
-          <div className="text-[0.85vw]">Loading...</div>
-        ) : (
-          attendeeNames[meetingId]?.map((name, i) => (
-            <div key={i} className="leading-tight">
-              • {name}
-            </div>
-          )) || <div>No names found</div>
-        )}
+        {attendeeNames[meetingId]?.map((name, i) => (
+          <div key={i} className="leading-tight">
+            • {name}
+          </div>
+        )) || <div>No names found</div>}
         <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 w-0 h-0 border-l-8 border-r-8 border-t-8 border-transparent border-t-black"></div>
       </div>,
       document.body
@@ -1038,7 +753,6 @@ const MeetingsCard = ({
 
   return (
     <div className="bg-white p-[1vw] px-[1.5vw] rounded-xl shadow-sm flex flex-col overflow-hidden h-full">
-      {/* Header */}
       <div className="flex items-center justify-between mb-[1vw] flex-shrink-0">
         <h3 className="font-semibold text-[0.9vw] text-gray-800">Meetings</h3>
         <div className="flex items-center gap-[1vw]">
@@ -1054,7 +768,6 @@ const MeetingsCard = ({
         </div>
       </div>
 
-      {/* Week Navigator */}
       <div className="flex items-center justify-between mb-[1vw] flex-shrink-0 border-b border-gray-200 pb-[0.5vw]">
         <button
           onClick={() => changeDate(-1)}
@@ -1095,13 +808,8 @@ const MeetingsCard = ({
         </button>
       </div>
 
-      {/* Meetings List - Height changed to flex-1 for full screen compatibility */}
       <div className="space-y-[0.8vw] overflow-y-auto flex-1 min-h-0 pr-[0.5vw] scrollbar-thin">
-        {parentLoading ? (
-          <div className="text-center text-gray-500 text-[0.8vw] py-8">
-            Loading meetings...
-          </div>
-        ) : filteredMeetings.length === 0 ? (
+        {filteredMeetings.length === 0 ? (
           <div className="text-center text-gray-500 text-[0.8vw] py-8">
             No meetings scheduled
           </div>
@@ -1144,135 +852,47 @@ const MeetingsCard = ({
 // --- MAIN PAGE ---
 const Personal = () => {
   const [stats, setStats] = useState({
-    employees: 0,
-    overall: 0,
-    completed: 0,
-    ongoing: 0,
-    delayed: 0,
-    overdue: 0,
+    employees: 5,
+    overall: 12,
+    completed: 5,
+    ongoing: 4,
+    delayed: 2,
+    overdue: 1,
   });
-  const [employees, setEmployees] = useState([]);
-  const [allEvents, setAllEvents] = useState([]);
-  const [allTasks, setAllTasks] = useState([]);
-  const [unscheduledTask, setUnscheduledTask] = useState([]);
-  const [dayTask, setDayTask] = useState([]);
-  const [taskEmployees, setTaskEmployees] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
 
-  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
-
-    const memoizedEmployees = useMemo(() => taskEmployees, [taskEmployees]);
-
-  useEffect(() => {
-    const fetchAllData = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const [statsRes, empsRes, eventsRes, tasksRes] = await Promise.all([
-          fetch(`${API_BASE_URL}/analytics/overview`),
-          fetch(`${API_BASE_URL}/employeeRegister/all`),
-          fetch(`${API_BASE_URL}/events`),
-          fetch(`${API_BASE_URL}/tasks/dashboard`),
-        ]);
-
-        if (!statsRes.ok || !empsRes.ok || !eventsRes.ok || !tasksRes.ok)
-          throw new Error("Data fetch failed");
-
-        const [statsData, empsData, eventsData, tasksData] = await Promise.all([
-          statsRes.json(),
-          empsRes.json(),
-          eventsRes.json(),
-          tasksRes.json(),
-        ]);
-
-        const s = statsData.data.overallStats;
-        setStats({
-          employees:
-            empsData.employees?.filter((e) => e.role === "Employee").length ||
-            0,
-          overall:
-            (s.completed || 0) +
-            (s.ongoing || 0) +
-            (s.delayed || 0) +
-            (s.overdue || 0),
-          completed: s.completed || 0,
-          ongoing: s.ongoing || 0,
-          delayed: s.delayed || 0,
-          overdue: s.overdue || 0,
-        });
-        setEmployees(empsData.employees || []);
-        setAllEvents(eventsData.data || []);
-        setAllTasks(tasksData.tasks || []);
-        setUnscheduledTask(tasksData.unscheduledTask || []);
-        setDayTask(tasksData.dayTask || []);
-        setTaskEmployees(tasksData.employees || []);
-      } catch (err) {
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchAllData();
-  }, [API_BASE_URL]);
+  const placeholderIconSrc = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%236B7280'%3E%3Cpath d='M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z'/%3E%3C/svg%3E";
 
   return (
     <div className="flex flex-col gap-[1.5vh] h-full w-full pb-[1vh]">
-      <div className="flex justify-between w-full  flex-none">
+      <div className="flex justify-between w-full flex-none">
         {statsDataConfig.map((s) => (
           <StatCard
             key={s.type}
-            value={loading ? "-" : stats[s.type]}
+            value={stats[s.type]}
             label={s.title}
             color={s.color}
-            iconSrc={s.iconSrc}
+            iconSrc={placeholderIconSrc}
             iconAlt={s.title}
           />
         ))}
       </div>
 
-      {error && (
-        <div className="text-red-500 text-[0.8vw] bg-red-100 p-2 rounded">
-          Error: {error}
-        </div>
-      )}
-
       <div className="grid grid-cols-3 gap-[1vw] flex-1 min-h-0">
         <div className="h-full min-h-0">
-          <TodayTasksCard
-            tasks={allTasks}
-            loading={loading}
-            apiBaseUrl={API_BASE_URL}
-            unscheduledTask={unscheduledTask}
-            dayTask={dayTask}
-            employees={memoizedEmployees}
-          />
+          <TodayTasksCard />
         </div>
 
         <div className="flex flex-col gap-[1.5vh] h-full min-h-0">
-          <div className="h-[28%] flex-none">
-            <CelebrationsCard
-              employees={employees}
-              events={allEvents}
-              loading={loading}
-              apiBaseUrl={API_BASE_URL}
-            />
+          <div className="flex-1 min-h-0">
+            <CelebrationsCard />
           </div>
           <div className="flex-1 min-h-0">
-            <AnnouncementCard
-              allEvents={allEvents}
-              isLoading={loading}
-              apiError={error}
-            />
+            <AnnouncementCard />
           </div>
         </div>
 
         <div className="h-full min-h-0">
-          <MeetingsCard
-            allEvents={allEvents}
-            isLoading={loading}
-            apiError={error}
-          />
+          <MeetingsCard />
         </div>
       </div>
     </div>

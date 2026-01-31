@@ -1096,4 +1096,30 @@ router.delete("/:followupId", async (req, res) => {
   }
 });
 
+router.patch("/meetings/:meetingId/status", async (req, res) => {
+  const { meetingId } = req.params;
+  const { status } = req.body;
+
+  if (!status || !["inprogress", "completed"].includes(status)) {
+    return res.status(400).json({ 
+      error: "Invalid status. Must be 'inprogress' or 'completed'" 
+    });
+  }
+
+  try {
+    await queryWithRetry(
+      `UPDATE ManagementMeetings SET status = ? WHERE id = ?`,
+      [status, meetingId]
+    );
+
+    res.status(200).json({
+      success: true,
+      message: "Meeting status updated successfully",
+    });
+  } catch (err) {
+    console.error("Error updating meeting status:", err);
+    res.status(500).json({ error: "Failed to update meeting status" });
+  }
+});
+
 module.exports = router;

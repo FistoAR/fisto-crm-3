@@ -89,7 +89,7 @@ function AppContent() {
 
 
   return (
-    <Router>
+    <Router basename="/fisto_crm/">
       <Routes>
         {/* Login Route - No Sidebar/Navbar */}
         <Route path="/" element={<Login />} />
@@ -151,6 +151,22 @@ function AppContent() {
 
                     {/* ProjectHead Routes */}
                     <Route path="projectHead/*" element={<ProjectHead />}>
+                      <Route
+                        index
+                        element={<Navigate to="addReport" replace />}
+                      />
+                      <Route path="analytics" element={<PHAnalytics />} />
+                      <Route path="addReports" element={<PHAssignTask />} />
+                      <Route path="reports" element={<PHinternReports />} />
+                      <Route path="addProject" element={<PHaddProject />} />
+                      <Route
+                        path="hrActivities"
+                        element={<MarketingHRactivities />}
+                      />
+                      <Route path="workdone" element={<PHworkdone />} />
+                    </Route>
+
+                    <Route path="sbu/*" element={<ProjectHead />}>
                       <Route
                         index
                         element={<Navigate to="addReport" replace />}

@@ -10,8 +10,6 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
-  LineChart,
-  Line,
 } from "recharts";
 import {
   Plus,
@@ -20,27 +18,18 @@ import {
   DollarSign,
   Target,
   TrendingUp,
-  TrendingDown,
   Users,
   Calendar,
   CheckCircle,
   Clock,
-  AlertCircle,
   RefreshCw,
   X,
   ChevronLeft,
   ChevronRight,
-  Download,
-  Filter,
   Search,
   Building2,
-  Briefcase,
-  CreditCard,
   PiggyBank,
   ArrowUpRight,
-  ArrowDownRight,
-  MoreVertical,
-  FileText,
   History,
   ChevronDown,
   Eye,
@@ -120,26 +109,6 @@ const PROJECT_CATEGORIES = [
   "Other",
 ];
 
-// Payment Status Options
-const PAYMENT_STATUS = [
-  {
-    value: "pending",
-    label: "Pending",
-    color: "bg-yellow-100 text-yellow-700",
-  },
-  {
-    value: "partial",
-    label: "Partial Received",
-    color: "bg-blue-100 text-blue-700",
-  },
-  {
-    value: "received",
-    label: "Fully Received",
-    color: "bg-green-100 text-green-700",
-  },
-  { value: "overdue", label: "Overdue", color: "bg-red-100 text-red-700" },
-];
-
 // Generate month options for selection
 const generateMonthOptions = (count = 24) => {
   const months = [];
@@ -189,14 +158,11 @@ const Budget = () => {
   // Modal States
   const [showBudgetModal, setShowBudgetModal] = useState(false);
   const [showClientModal, setShowClientModal] = useState(false);
-  const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showNewMonthModal, setShowNewMonthModal] = useState(false);
   const [editingClient, setEditingClient] = useState(null);
-  const [selectedClient, setSelectedClient] = useState(null);
 
   // Filter States
   const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
 
@@ -207,13 +173,7 @@ const Budget = () => {
     clientName: "",
     projectName: "",
     projectCategory: "",
-    expectedAmount: "",
-    dueDate: "",
-    notes: "",
-  });
-  const [paymentForm, setPaymentForm] = useState({
     receivedAmount: "",
-    paymentStatus: "",
     notes: "",
   });
   const [newMonthForm, setNewMonthForm] = useState({
@@ -333,15 +293,6 @@ const Budget = () => {
   }, [budgetHistoryData, selectedViewMonth]);
 
   // Computed Values based on viewing data
-  const totalExpected = useMemo(
-    () =>
-      viewingClients.reduce(
-        (sum, c) => sum + parseFloat(c.expected_amount || 0),
-        0,
-      ),
-    [viewingClients],
-  );
-
   const totalReceived = useMemo(
     () =>
       viewingClients.reduce(
@@ -356,12 +307,11 @@ const Budget = () => {
     [totalReceived, viewingBudget],
   );
 
-  const pendingAmount = useMemo(
-    () => totalExpected - totalReceived,
-    [totalExpected, totalReceived],
+  const remainingBudget = useMemo(
+    () => viewingBudget - totalReceived,
+    [viewingBudget, totalReceived],
   );
 
-  // Category Distribution for Pie Chart
   // Category Distribution for Pie Chart
   const categoryData = useMemo(() => {
     const categoryMap = {};
@@ -370,7 +320,7 @@ const Budget = () => {
         categoryMap[client.project_category] = 0;
       }
       categoryMap[client.project_category] += parseFloat(
-        client.expected_amount,
+        client.received_amount || 0,
       );
     });
 
@@ -393,22 +343,6 @@ const Budget = () => {
     }));
   }, [viewingClients]);
 
-  // Payment Status Distribution
-  // Payment Status Distribution
-  const statusData = useMemo(() => {
-    const statusMap = { pending: 0, partial: 0, received: 0, overdue: 0 };
-    viewingClients.forEach((client) => {
-      statusMap[client.payment_status]++;
-    });
-
-    return [
-      { name: "Pending", value: statusMap.pending, color: "#FCD34D" },
-      { name: "Partial", value: statusMap.partial, color: "#60A5FA" },
-      { name: "Received", value: statusMap.received, color: "#34D399" },
-      { name: "Overdue", value: statusMap.overdue, color: "#F87171" },
-    ].filter((item) => item.value > 0);
-  }, [viewingClients]);
-
   // Budget History for chart
   const budgetHistory = useMemo(() => {
     return availableMonths
@@ -429,7 +363,6 @@ const Budget = () => {
   }, [availableMonths, allClients, budgetHistoryData]);
 
   // Filtered Clients
-  // Filtered Clients
   const filteredClients = useMemo(() => {
     return viewingClients.filter((client) => {
       const matchesSearch =
@@ -437,14 +370,12 @@ const Budget = () => {
         client.client_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         client.project_name?.toLowerCase().includes(searchTerm.toLowerCase());
 
-      const matchesStatus =
-        statusFilter === "all" || client.payment_status === statusFilter;
       const matchesCategory =
         categoryFilter === "all" || client.project_category === categoryFilter;
 
-      return matchesSearch && matchesStatus && matchesCategory;
+      return matchesSearch && matchesCategory;
     });
-  }, [viewingClients, searchTerm, statusFilter, categoryFilter]);
+  }, [viewingClients, searchTerm, categoryFilter]);
 
   // Pagination
   const totalPages = Math.ceil(filteredClients.length / RECORDS_PER_PAGE);
@@ -457,7 +388,7 @@ const Budget = () => {
   // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, statusFilter, categoryFilter, selectedViewMonth]);
+  }, [searchTerm, categoryFilter, selectedViewMonth]);
 
   // Handlers
   const handleSetBudget = async () => {
@@ -526,8 +457,7 @@ const Budget = () => {
               client_name: clientForm.clientName,
               project_name: clientForm.projectName,
               project_category: clientForm.projectCategory,
-              expected_amount: Number(clientForm.expectedAmount),
-              due_date: clientForm.dueDate || null,
+              received_amount: Number(clientForm.receivedAmount),
               notes: clientForm.notes || null,
             }),
           },
@@ -546,8 +476,7 @@ const Budget = () => {
                     client_name: clientForm.clientName,
                     project_name: clientForm.projectName,
                     project_category: clientForm.projectCategory,
-                    expected_amount: Number(clientForm.expectedAmount),
-                    due_date: clientForm.dueDate,
+                    received_amount: Number(clientForm.receivedAmount),
                     notes: clientForm.notes,
                   }
                 : c,
@@ -569,8 +498,7 @@ const Budget = () => {
             client_name: clientForm.clientName,
             project_name: clientForm.projectName,
             project_category: clientForm.projectCategory,
-            expected_amount: Number(clientForm.expectedAmount),
-            due_date: clientForm.dueDate || null,
+            received_amount: Number(clientForm.receivedAmount),
             notes: clientForm.notes || null,
             month: currentMonth,
           }),
@@ -586,10 +514,7 @@ const Budget = () => {
             client_name: clientForm.clientName,
             project_name: clientForm.projectName,
             project_category: clientForm.projectCategory,
-            expected_amount: Number(clientForm.expectedAmount),
-            received_amount: 0,
-            payment_status: "pending",
-            due_date: clientForm.dueDate,
+            received_amount: Number(clientForm.receivedAmount),
             notes: clientForm.notes,
             month: currentMonth,
             created_at: new Date().toISOString(),
@@ -608,67 +533,11 @@ const Budget = () => {
         clientName: "",
         projectName: "",
         projectCategory: "",
-        expectedAmount: "",
-        dueDate: "",
+        receivedAmount: "",
         notes: "",
       });
     } catch (error) {
       console.error("Error adding/updating client:", error);
-      alert("Network error: " + error.message);
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  const handleUpdatePayment = async () => {
-    if (!selectedClient) return;
-
-    setActionLoading(true);
-    setLoadingMessage("Updating payment...");
-
-    try {
-      const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
-
-      const response = await fetch(
-        `${API_BASE_URL}/budget/clients/${selectedClient.id}/payment`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            "x-user-data": JSON.stringify(userData),
-          },
-          body: JSON.stringify({
-            received_amount: Number(paymentForm.receivedAmount),
-            payment_status: paymentForm.paymentStatus,
-            notes: paymentForm.notes,
-          }),
-        },
-      );
-
-      const data = await response.json();
-
-      if (data.success) {
-        // Update local state
-        setAllClients((prev) =>
-          prev.map((c) =>
-            c.id === selectedClient.id
-              ? {
-                  ...c,
-                  received_amount: Number(paymentForm.receivedAmount),
-                  payment_status: paymentForm.paymentStatus,
-                  notes: paymentForm.notes || c.notes,
-                }
-              : c,
-          ),
-        );
-        setShowPaymentModal(false);
-        setSelectedClient(null);
-        setPaymentForm({ receivedAmount: "", paymentStatus: "", notes: "" });
-      } else {
-        alert("Failed to update payment: " + data.error);
-      }
-    } catch (error) {
-      console.error("Error updating payment:", error);
       alert("Network error: " + error.message);
     } finally {
       setActionLoading(false);
@@ -714,21 +583,10 @@ const Budget = () => {
       clientName: client.client_name,
       projectName: client.project_name,
       projectCategory: client.project_category,
-      expectedAmount: client.expected_amount,
-      dueDate: client.due_date,
+      receivedAmount: client.received_amount,
       notes: client.notes,
     });
     setShowClientModal(true);
-  };
-
-  const handleOpenPaymentModal = (client) => {
-    setSelectedClient(client);
-    setPaymentForm({
-      receivedAmount: client.received_amount,
-      paymentStatus: client.payment_status,
-      notes: client.notes,
-    });
-    setShowPaymentModal(true);
   };
 
   const handleOpenNewMonthModal = () => {
@@ -806,11 +664,6 @@ const Budget = () => {
       month: "short",
       year: "numeric",
     });
-  };
-
-  const getStatusBadge = (status) => {
-    const statusInfo = PAYMENT_STATUS.find((s) => s.value === status);
-    return statusInfo || PAYMENT_STATUS[0];
   };
 
   // Show main loading screen
@@ -1062,7 +915,7 @@ const Budget = () => {
           {mainTab === "overview" && (
             <div className="flex-1 p-[1vw] overflow-auto">
               {/* Stats Cards */}
-              <div className="grid grid-cols-4 gap-[1.2vw] mb-[1.5vw]">
+              <div className="grid grid-cols-3 gap-[1.2vw] mb-[1.5vw]">
                 {/* Monthly Budget Card */}
                 <div className="bg-gradient-to-br from-blue-100 to-blue-200 rounded-xl p-[1.3vw] shadow-sm border border-blue-100">
                   <div className="flex items-center justify-between">
@@ -1076,23 +929,6 @@ const Budget = () => {
                     </div>
                     <div className="bg-white/70 p-[0.8vw] rounded-full">
                       <Target className="w-[2vw] h-[2vw] text-blue-600" />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Total Expected Card */}
-                <div className="bg-gradient-to-br from-violet-100 to-violet-200 rounded-xl p-[1.3vw] shadow-sm border border-violet-100">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-[0.85vw] text-violet-700 font-medium">
-                        Total Expected
-                      </p>
-                      <h2 className="text-[2vw] font-bold text-violet-900 mt-[0.3vw]">
-                        {formatCurrency(totalExpected)}
-                      </h2>
-                    </div>
-                    <div className="bg-white/70 p-[0.8vw] rounded-full">
-                      <FileText className="w-[2vw] h-[2vw] text-violet-600" />
                     </div>
                   </div>
                 </div>
@@ -1123,25 +959,20 @@ const Budget = () => {
                   </div>
                 </div>
 
-                {/* Pending Amount Card */}
+                {/* Remaining Budget Card */}
                 <div className="bg-gradient-to-br from-amber-100 to-amber-200 rounded-xl p-[1.3vw] shadow-sm border border-amber-100">
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-[0.85vw] text-amber-700 font-medium">
-                        Pending Amount
+                        Remaining Budget
                       </p>
                       <h2 className="text-[2vw] font-bold text-amber-900 mt-[0.3vw]">
-                        {formatCurrency(pendingAmount)}
+                        {formatCurrency(remainingBudget)}
                       </h2>
                       <div className="flex items-center mt-[0.3vw]">
                         <Clock size={"0.9vw"} className="text-amber-600" />
                         <span className="text-[0.75vw] text-amber-600 font-medium ml-[0.2vw]">
-                          {
-                            viewingClients.filter(
-                              (c) => c.payment_status !== "received",
-                            ).length
-                          }{" "}
-                          pending
+                          {viewingClients.length} clients
                         </span>
                       </div>
                     </div>
@@ -1257,72 +1088,33 @@ const Budget = () => {
                   </div>
                 </div>
 
-                {/* Payment Status Distribution */}
+                {/* Client Summary */}
                 <div className="bg-white border border-gray-200 rounded-xl p-[1.2vw]">
                   <h3 className="text-[1vw] font-semibold text-gray-800 mb-[0.8vw]">
-                    Payment Status
+                    Client Summary
                   </h3>
-                  <div className="flex items-center">
-                    <div className="w-[60%]">
-                      {statusData.length > 0 ? (
-                        <ResponsiveContainer width="100%" height={250}>
-                          <PieChart>
-                            <Pie
-                              data={statusData}
-                              dataKey="value"
-                              nameKey="name"
-                              cx="50%"
-                              cy="50%"
-                              innerRadius={60}
-                              outerRadius={100}
-                              labelLine={false}
-                              label={renderPercentLabel}
-                            >
-                              {statusData.map((entry, index) => (
-                                <Cell
-                                  key={`cell-${index}`}
-                                  fill={entry.color}
-                                  stroke="none"
-                                />
-                              ))}
-                            </Pie>
-                            <Tooltip />
-                          </PieChart>
-                        </ResponsiveContainer>
-                      ) : (
-                        <div className="flex flex-col items-center justify-center h-[250px] text-gray-400">
-                          <CreditCard
-                            size={"2.5vw"}
-                            className="mb-[0.5vw] opacity-50"
-                          />
-                          <p className="text-[0.85vw]">No data available</p>
-                          <p className="text-[0.75vw]">
-                            Add clients to see chart
-                          </p>
-                        </div>
-                      )}
+                  <div className="flex flex-col gap-[1vw]">
+                    <div className="bg-gray-50 rounded-lg p-[1vw]">
+                      <div className="flex items-center justify-between mb-[0.5vw]">
+                        <span className="text-[0.85vw] text-gray-600">Total Clients</span>
+                        <span className="text-[1.5vw] font-bold text-gray-800">{viewingClients.length}</span>
+                      </div>
                     </div>
-                    <div className="w-[40%] pl-[1vw]">
-                      <div className="flex flex-col gap-[0.8vw]">
-                        {statusData.map((entry, index) => (
-                          <div
-                            key={index}
-                            className="flex items-center justify-between"
-                          >
-                            <div className="flex items-center gap-[0.5vw]">
-                              <div
-                                className="w-[0.9vw] h-[0.9vw] rounded-full flex-shrink-0"
-                                style={{ backgroundColor: entry.color }}
-                              />
-                              <span className="text-[0.85vw] text-gray-600">
-                                {entry.name}
-                              </span>
-                            </div>
-                            <span className="text-[0.9vw] font-bold text-gray-800">
-                              {entry.value}
-                            </span>
-                          </div>
-                        ))}
+                    <div className="bg-emerald-50 rounded-lg p-[1vw]">
+                      <div className="flex items-center justify-between mb-[0.5vw]">
+                        <span className="text-[0.85vw] text-emerald-700">Average per Client</span>
+                        <span className="text-[1.2vw] font-bold text-emerald-800">
+                          {viewingClients.length > 0 
+                            ? formatCurrency(totalReceived / viewingClients.length)
+                            : formatCurrency(0)
+                          }
+                        </span>
+                      </div>
+                    </div>
+                    <div className="bg-blue-50 rounded-lg p-[1vw]">
+                      <div className="flex items-center justify-between mb-[0.5vw]">
+                        <span className="text-[0.85vw] text-blue-700">Categories</span>
+                        <span className="text-[1.2vw] font-bold text-blue-800">{categoryData.length}</span>
                       </div>
                     </div>
                   </div>
@@ -1366,14 +1158,11 @@ const Budget = () => {
                         </div>
                       </div>
                       <div className="text-right">
-                        <p className="text-[0.9vw] font-semibold text-gray-800">
-                          {formatCurrency(client.received_amount)} /{" "}
-                          {formatCurrency(client.expected_amount)}
+                        <p className="text-[0.9vw] font-semibold text-emerald-600">
+                          {formatCurrency(client.received_amount)}
                         </p>
-                        <span
-                          className={`text-[0.7vw] px-[0.5vw] py-[0.15vw] rounded-full ${getStatusBadge(client.payment_status).color}`}
-                        >
-                          {getStatusBadge(client.payment_status).label}
+                        <span className="text-[0.7vw] px-[0.5vw] py-[0.15vw] rounded-full bg-gray-100 text-gray-600">
+                          {client.project_category}
                         </span>
                       </div>
                     </div>
@@ -1442,20 +1231,6 @@ const Budget = () => {
                     />
                   </div>
 
-                  {/* Status Filter */}
-                  <select
-                    value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value)}
-                    className="px-[0.8vw] py-[0.35vw] rounded-lg text-[0.85vw] bg-gray-100 border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
-                  >
-                    <option value="all">All Status</option>
-                    {PAYMENT_STATUS.map((status) => (
-                      <option key={status.value} value={status.value}>
-                        {status.label}
-                      </option>
-                    ))}
-                  </select>
-
                   {/* Category Filter */}
                   <select
                     value={categoryFilter}
@@ -1491,13 +1266,7 @@ const Budget = () => {
                           Category
                         </th>
                         <th className="px-[0.7vw] py-[0.6vw] text-right text-[0.85vw] font-medium text-gray-800 border-b border-gray-300">
-                          Expected
-                        </th>
-                        <th className="px-[0.7vw] py-[0.6vw] text-right text-[0.85vw] font-medium text-gray-800 border-b border-gray-300">
-                          Received
-                        </th>
-                        <th className="px-[0.7vw] py-[0.6vw] text-center text-[0.85vw] font-medium text-gray-800 border-b border-gray-300">
-                          Status
+                          Received Amount
                         </th>
                         {isViewingCurrentMonth && (
                           <th className="px-[0.7vw] py-[0.6vw] text-center text-[0.85vw] font-medium text-gray-800 border-b border-gray-300">
@@ -1510,7 +1279,7 @@ const Budget = () => {
                       {paginatedClients.length === 0 ? (
                         <tr>
                           <td
-                            colSpan={isViewingCurrentMonth ? 9 : 8}
+                            colSpan={isViewingCurrentMonth ? 6 : 5}
                             className="text-center py-[3vw] text-gray-500"
                           >
                             <div className="flex flex-col items-center">
@@ -1563,40 +1332,14 @@ const Budget = () => {
                                 {client.project_category}
                               </span>
                             </td>
-                            <td className="px-[0.7vw] py-[0.6vw] text-[0.85vw] text-right font-medium text-gray-800 border-b border-gray-200">
-                              {formatCurrency(client.expected_amount)}
-                            </td>
                             <td className="px-[0.7vw] py-[0.6vw] text-[0.85vw] text-right font-medium border-b border-gray-200">
-                              <span
-                                className={
-                                  client.received_amount >=
-                                  client.expected_amount
-                                    ? "text-emerald-600"
-                                    : "text-gray-800"
-                                }
-                              >
+                              <span className="text-emerald-600">
                                 {formatCurrency(client.received_amount)}
-                              </span>
-                            </td>
-                            <td className="px-[0.7vw] py-[0.6vw] text-center border-b border-gray-200">
-                              <span
-                                className={`text-[0.75vw] px-[0.6vw] py-[0.2vw] rounded-full ${getStatusBadge(client.payment_status).color}`}
-                              >
-                                {getStatusBadge(client.payment_status).label}
                               </span>
                             </td>
                             {isViewingCurrentMonth && (
                               <td className="px-[0.7vw] py-[0.6vw] border-b border-gray-200">
                                 <div className="flex items-center justify-center gap-[0.3vw]">
-                                  <button
-                                    onClick={() =>
-                                      handleOpenPaymentModal(client)
-                                    }
-                                    className="p-[0.4vw] text-emerald-600 hover:bg-emerald-50 rounded-full transition-colors cursor-pointer"
-                                    title="Update Payment"
-                                  >
-                                    <CreditCard size={"1vw"} />
-                                  </button>
                                   <button
                                     onClick={() => handleEditClient(client)}
                                     className="p-[0.4vw] text-blue-600 hover:bg-blue-50 rounded-full transition-colors cursor-pointer"
@@ -1917,8 +1660,7 @@ const Budget = () => {
                     clientName: "",
                     projectName: "",
                     projectCategory: "",
-                    expectedAmount: "",
-                    dueDate: "",
+                    receivedAmount: "",
                     notes: "",
                   });
                 }}
@@ -2060,19 +1802,19 @@ const Budget = () => {
             <div className="grid grid-cols-2 gap-[1vw] mb-[1vw]">
               <div>
                 <label className="block text-[0.85vw] font-medium text-gray-700 mb-[0.3vw]">
-                  Expected Amount (₹) *
+                  Received Amount (₹) *
                 </label>
                 <input
                   type="number"
-                  value={clientForm.expectedAmount}
+                  value={clientForm.receivedAmount}
                   onChange={(e) =>
                     setClientForm((prev) => ({
                       ...prev,
-                      expectedAmount: e.target.value,
+                      receivedAmount: e.target.value,
                     }))
                   }
                   className="w-full px-[0.8vw] py-[0.5vw] border border-gray-300 rounded-lg text-[0.9vw] focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Enter expected amount"
+                  placeholder="Enter received amount"
                 />
               </div>
             </div>
@@ -2103,8 +1845,7 @@ const Budget = () => {
                     clientName: "",
                     projectName: "",
                     projectCategory: "",
-                    expectedAmount: "",
-                    dueDate: "",
+                    receivedAmount: "",
                     notes: "",
                   });
                 }}
@@ -2119,140 +1860,13 @@ const Budget = () => {
                   !clientForm.clientName ||
                   !clientForm.projectName ||
                   !clientForm.projectCategory ||
-                  !clientForm.expectedAmount ||
+                  !clientForm.receivedAmount ||
                   actionLoading
                 }
                 className="px-[1vw] py-[0.4vw] bg-blue-600 text-white rounded-lg text-[0.85vw] font-medium hover:bg-blue-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-[0.3vw]"
               >
                 {actionLoading && <LoadingSpinner size={"0.9vw"} />}
                 {editingClient ? "Update Client" : "Add Client"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* UPDATE PAYMENT MODAL */}
-      {showPaymentModal && selectedClient && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100]">
-          <div className="bg-white rounded-xl p-[1.5vw] w-[30vw] shadow-2xl">
-            <div className="flex items-center justify-between mb-[1vw]">
-              <h3 className="text-[1.1vw] font-semibold text-gray-800">
-                Update Payment
-              </h3>
-              <button
-                onClick={() => {
-                  setShowPaymentModal(false);
-                  setSelectedClient(null);
-                }}
-                className="p-[0.3vw] hover:bg-gray-100 rounded-full cursor-pointer"
-              >
-                <X size={"1vw"} />
-              </button>
-            </div>
-
-            {/* Client Info */}
-            <div className="bg-gray-50 rounded-lg p-[0.8vw] mb-[1vw]">
-              <p className="text-[0.9vw] font-medium text-gray-800">
-                {selectedClient.company_name}
-              </p>
-              <p className="text-[0.8vw] text-gray-500">
-                {selectedClient.project_name}
-              </p>
-              <div className="flex items-center justify-between mt-[0.5vw]">
-                <span className="text-[0.8vw] text-gray-600">
-                  Expected Amount:
-                </span>
-                <span className="text-[0.9vw] font-semibold text-gray-800">
-                  {formatCurrency(selectedClient.expected_amount)}
-                </span>
-              </div>
-            </div>
-
-            <div className="mb-[1vw]">
-              <label className="block text-[0.85vw] font-medium text-gray-700 mb-[0.3vw]">
-                Amount Received (₹)
-              </label>
-              <input
-                type="number"
-                value={paymentForm.receivedAmount}
-                onChange={(e) =>
-                  setPaymentForm((prev) => ({
-                    ...prev,
-                    receivedAmount: e.target.value,
-                  }))
-                }
-                className="w-full px-[0.8vw] py-[0.5vw] border border-gray-300 rounded-lg text-[0.9vw] focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="Enter received amount"
-              />
-              {paymentForm.receivedAmount &&
-                Number(paymentForm.receivedAmount) <
-                  selectedClient.expectedAmount && (
-                  <p className="text-[0.75vw] text-amber-600 mt-[0.3vw]">
-                    Difference:{" "}
-                    {formatCurrency(
-                      selectedClient.expectedAmount -
-                        Number(paymentForm.receivedAmount),
-                    )}{" "}
-                    pending
-                  </p>
-                )}
-            </div>
-
-            <div className="mb-[1vw]">
-              <label className="block text-[0.85vw] font-medium text-gray-700 mb-[0.3vw]">
-                Payment Status
-              </label>
-              <select
-                value={paymentForm.paymentStatus}
-                onChange={(e) =>
-                  setPaymentForm((prev) => ({
-                    ...prev,
-                    paymentStatus: e.target.value,
-                  }))
-                }
-                className="w-full px-[0.8vw] py-[0.5vw] border border-gray-300 rounded-lg text-[0.9vw] focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
-              >
-                {PAYMENT_STATUS.map((status) => (
-                  <option key={status.value} value={status.value}>
-                    {status.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="mb-[1.2vw]">
-              <label className="block text-[0.85vw] font-medium text-gray-700 mb-[0.3vw]">
-                Notes
-              </label>
-              <textarea
-                value={paymentForm.notes}
-                onChange={(e) =>
-                  setPaymentForm((prev) => ({ ...prev, notes: e.target.value }))
-                }
-                className="w-full px-[0.8vw] py-[0.5vw] border border-gray-300 rounded-lg text-[0.9vw] focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                rows={2}
-                placeholder="Add payment notes..."
-              />
-            </div>
-
-            <div className="flex items-center gap-[0.8vw] justify-end">
-              <button
-                onClick={() => {
-                  setShowPaymentModal(false);
-                  setSelectedClient(null);
-                }}
-                className="px-[1vw] py-[0.4vw] bg-gray-200 text-gray-700 rounded-lg text-[0.85vw] font-medium hover:bg-gray-300 transition-colors cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleUpdatePayment}
-                disabled={actionLoading}
-                className="px-[1vw] py-[0.4vw] bg-emerald-600 text-white rounded-lg text-[0.85vw] font-medium hover:bg-emerald-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-[0.3vw]"
-              >
-                {actionLoading && <LoadingSpinner size={"0.9vw"} />}
-                Update Payment
               </button>
             </div>
           </div>
@@ -2315,19 +1929,14 @@ const Budget = () => {
                       {formatCurrency(
                         allClients
                           .filter((c) => c.month === currentMonth)
-                          .reduce((sum, c) => sum + c.receivedAmount, 0),
+                          .reduce((sum, c) => sum + parseFloat(c.received_amount || 0), 0),
                       )}
                     </p>
                   </div>
                   <div>
                     <p className="text-[0.7vw] text-gray-500">Clients</p>
                     <p className="text-[0.85vw] font-semibold text-gray-800">
-                      {allClients
-                        .filter((c) => c.month === currentMonth)
-                        .reduce(
-                          (sum, c) => sum + parseFloat(c.received_amount || 0),
-                          0,
-                        )}
+                      {allClients.filter((c) => c.month === currentMonth).length}
                     </p>
                   </div>
                 </div>

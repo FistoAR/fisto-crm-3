@@ -129,8 +129,7 @@ router.post("/clients", async (req, res) => {
       client_name,
       project_name,
       project_category,
-      expected_amount,
-      due_date,
+      received_amount,
       notes,
       month,
     } = req.body;
@@ -141,7 +140,7 @@ router.post("/clients", async (req, res) => {
       !client_name ||
       !project_name ||
       !project_category ||
-      !expected_amount ||
+      received_amount === undefined ||
       !month
     ) {
       return res.status(400).json({
@@ -152,16 +151,15 @@ router.post("/clients", async (req, res) => {
 
     const result = await queryWithRetry(
       `INSERT INTO budget_clients 
-       (company_name, client_name, project_name, project_category, expected_amount, 
-        due_date, notes, month, created_by) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       (company_name, client_name, project_name, project_category, received_amount, 
+        notes, month, created_by) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         company_name,
         client_name,
         project_name,
         project_category,
-        parseFloat(expected_amount),
-        due_date || null,
+        parseFloat(received_amount),
         notes || null,
         month,
         employee_id,
@@ -191,8 +189,7 @@ router.put("/clients/:id", async (req, res) => {
       client_name,
       project_name,
       project_category,
-      expected_amount,
-      due_date,
+      received_amount,
       notes,
     } = req.body;
 
@@ -212,7 +209,7 @@ router.put("/clients/:id", async (req, res) => {
     await queryWithRetry(
       `UPDATE budget_clients 
        SET company_name = ?, client_name = ?, project_name = ?, 
-           project_category = ?, expected_amount = ?, due_date = ?, 
+           project_category = ?, received_amount = ?, 
            notes = ?, updated_at = NOW() 
        WHERE id = ?`,
       [
@@ -220,8 +217,7 @@ router.put("/clients/:id", async (req, res) => {
         client_name,
         project_name,
         project_category,
-        parseFloat(expected_amount),
-        due_date || null,
+        parseFloat(received_amount),
         notes || null,
         id,
       ]
@@ -277,7 +273,7 @@ router.delete("/clients/:id", async (req, res) => {
 router.get("/clients/month/:month", async (req, res) => {
   try {
     const { month } = req.params;
-    const { search, status, category } = req.query;
+    const { search, category } = req.query;
 
     let query = "SELECT * FROM budget_clients WHERE month = ?";
     let params = [month];
@@ -287,12 +283,6 @@ router.get("/clients/month/:month", async (req, res) => {
       query += ` AND (company_name LIKE ? OR client_name LIKE ? OR project_name LIKE ?)`;
       const searchTerm = `%${search}%`;
       params.push(searchTerm, searchTerm, searchTerm);
-    }
-
-    // Add status filter
-    if (status && status !== "all") {
-      query += ` AND payment_status = ?`;
-      params.push(status);
     }
 
     // Add category filter
@@ -339,92 +329,6 @@ router.get("/clients", async (req, res) => {
   }
 });
 
-// ========== UPDATE PAYMENT ==========
-router.put("/clients/:id/payment", async (req, res) => {
-  try {
-    const userData = JSON.parse(req.headers["x-user-data"] || "{}");
-    const employee_id = userData.userName || "FST001";
-    const { id } = req.params;
-    const { received_amount, payment_status, notes } = req.body;
-
-    // Get current payment info
-    const current = await queryWithRetry(
-      "SELECT received_amount, payment_status, notes FROM budget_clients WHERE id = ?",
-      [id]
-    );
-
-    if (current.length === 0) {
-      return res.status(404).json({
-        success: false,
-        error: "Client not found",
-      });
-    }
-
-    const previous = current[0];
-    const amount_change = parseFloat(received_amount) - previous.received_amount;
-
-    // Update client payment
-    await queryWithRetry(
-      `UPDATE budget_clients 
-       SET received_amount = ?, payment_status = ?, notes = ?, updated_at = NOW() 
-       WHERE id = ?`,
-      [parseFloat(received_amount), payment_status, notes || previous.notes, id]
-    );
-
-    // Insert payment history
-    await queryWithRetry(
-      `INSERT INTO budget_payment_history 
-       (client_id, previous_amount, new_amount, amount_change, 
-        previous_status, new_status, notes, updated_by) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        id,
-        previous.received_amount,
-        parseFloat(received_amount),
-        amount_change,
-        previous.payment_status,
-        payment_status,
-        notes || null,
-        employee_id,
-      ]
-    );
-
-    res.json({
-      success: true,
-      message: "Payment updated successfully",
-    });
-  } catch (err) {
-    console.error("❌ Update payment error:", err);
-    res.status(500).json({
-      success: false,
-      error: "Failed to update payment",
-    });
-  }
-});
-
-// ========== GET PAYMENT HISTORY FOR CLIENT ==========
-router.get("/clients/:id/payment-history", async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    const results = await queryWithRetry(
-      "SELECT * FROM budget_payment_history WHERE client_id = ? ORDER BY updated_at DESC",
-      [id]
-    );
-
-    res.json({
-      success: true,
-      history: results,
-    });
-  } catch (err) {
-    console.error("❌ Get payment history error:", err);
-    res.status(500).json({
-      success: false,
-      error: "Failed to fetch payment history",
-    });
-  }
-});
-
 // ========== GET MONTHLY OVERVIEW ==========
 router.get("/overview/:month", async (req, res) => {
   try {
@@ -444,30 +348,21 @@ router.get("/overview/:month", async (req, res) => {
     );
 
     // Calculate totals
-    let total_expected = 0;
     let total_received = 0;
-    let status_counts = {
-      pending: 0,
-      partial: 0,
-      received: 0,
-      overdue: 0,
-    };
     let category_totals = {};
 
     clients.forEach((client) => {
-      total_expected += parseFloat(client.expected_amount);
-      total_received += parseFloat(client.received_amount);
-      status_counts[client.payment_status]++;
+      total_received += parseFloat(client.received_amount || 0);
 
       if (!category_totals[client.project_category]) {
         category_totals[client.project_category] = 0;
       }
       category_totals[client.project_category] += parseFloat(
-        client.expected_amount
+        client.received_amount || 0
       );
     });
 
-    const pending_amount = total_expected - total_received;
+    const remaining_budget = budget - total_received;
     const budget_progress = budget > 0 ? (total_received / budget) * 100 : 0;
 
     res.json({
@@ -475,12 +370,10 @@ router.get("/overview/:month", async (req, res) => {
       overview: {
         month: month,
         budget: budget,
-        total_expected: total_expected,
         total_received: total_received,
-        pending_amount: pending_amount,
+        remaining_budget: remaining_budget,
         budget_progress: budget_progress,
         client_count: clients.length,
-        status_distribution: status_counts,
         category_distribution: category_totals,
       },
     });
@@ -561,12 +454,11 @@ router.get("/categories/:month", async (req, res) => {
       `SELECT 
         project_category,
         COUNT(*) AS project_count,
-        SUM(expected_amount) AS total_expected,
         SUM(received_amount) AS total_received
       FROM budget_clients
       WHERE month = ?
       GROUP BY project_category
-      ORDER BY total_expected DESC`,
+      ORDER BY total_received DESC`,
       [month]
     );
 
@@ -579,36 +471,6 @@ router.get("/categories/:month", async (req, res) => {
     res.status(500).json({
       success: false,
       error: "Failed to fetch categories",
-    });
-  }
-});
-
-// ========== GET PAYMENT STATUS DISTRIBUTION ==========
-router.get("/status-distribution/:month", async (req, res) => {
-  try {
-    const { month } = req.params;
-
-    const results = await queryWithRetry(
-      `SELECT 
-        payment_status,
-        COUNT(*) AS count,
-        SUM(expected_amount) AS total_expected,
-        SUM(received_amount) AS total_received
-      FROM budget_clients
-      WHERE month = ?
-      GROUP BY payment_status`,
-      [month]
-    );
-
-    res.json({
-      success: true,
-      status_distribution: results,
-    });
-  } catch (err) {
-    console.error("❌ Get status distribution error:", err);
-    res.status(500).json({
-      success: false,
-      error: "Failed to fetch status distribution",
     });
   }
 });

@@ -103,14 +103,48 @@ const ProjectBudget = ({ showToast }) => {
     }
   }, [searchTerm, projects]);
 
+  const getProjectStatus = (project) => {
+    if (!project.budget || !project.payments) {
+      return { status: "pending", label: "Pending", color: "gray" };
+    }
+
+    const totalBudget = parseFloat(project.budget.totalBudget) || 0;
+    const completionDate = new Date(project.budget.complicationDate);
+    const today = new Date();
+
+    // Calculate total received amount from payments
+    const totalReceived = project.payments.reduce((sum, payment) => {
+      return sum + (parseFloat(payment.receivedAmount) || 0);
+    }, 0);
+
+    const budgetFullyReceived = totalReceived >= totalBudget;
+
+    if (budgetFullyReceived && today <= completionDate) {
+      return { status: "completed", label: "Completed", color: "green" };
+    } else if (today > completionDate && !budgetFullyReceived) {
+      return { status: "overdue", label: "Overdue", color: "red" };
+    } else if (budgetFullyReceived) {
+      return { status: "completed", label: "Completed", color: "green" };
+    } else {
+      return { status: "pending", label: "Pending", color: "gray" };
+    }
+  };
+
   const fetchProjects = async () => {
     setLoading(true);
     try {
       const res = await fetch(`${API_BASE_URL}/budget/projects`);
       const data = await res.json();
       if (data.success) {
-        setProjects(data.projects || []);
-        setFilteredProjects(data.projects || []);
+        // Fetch budget details for each project
+        const projectsWithDetails = await Promise.all(
+          (data.projects || []).map(async (project) => {
+            const details = await fetchProjectDetails(project.id);
+            return details ? { ...project, ...details } : project;
+          })
+        );
+        setProjects(projectsWithDetails);
+        setFilteredProjects(projectsWithDetails);
       } else {
         showToast("Error", data.error || "Failed to load projects");
       }
@@ -590,41 +624,77 @@ const ProjectBudget = ({ showToast }) => {
                             Project Category
                           </th>
                           <th className="px-[0.7vw] py-[0.5vw] text-center text-[0.9vw] font-medium text-gray-800 border border-gray-300">
+                            Status
+                          </th>
+                          <th className="px-[0.7vw] py-[0.5vw] text-center text-[0.9vw] font-medium text-gray-800 border border-gray-300">
                             Update
                           </th>
                         </tr>
                       </thead>
                       <tbody>
-                        {paginatedProjects.map((project, index) => (
-                          <tr
-                            key={project.id}
-                            className="hover:bg-gray-50 transition-colors"
-                          >
-                            <td className="px-[0.7vw] py-[0.56vw] text-[0.86vw] text-gray-900 border border-gray-300 text-center">
-                              {String(startIndex + index + 1).padStart(2, "0")}
-                            </td>
-                            <td className="px-[0.7vw] py-[0.56vw] text-[0.86vw] text-gray-600 border border-gray-300 text-center">
-                              {project.companyName}
-                            </td>
-                            <td className="px-[0.7vw] py-[0.56vw] text-[0.86vw] text-gray-600 border border-gray-300 text-center">
-                              {project.customerName}
-                            </td>
-                            <td className="px-[0.7vw] py-[0.56vw] text-[0.86vw] text-gray-600 border border-gray-300 text-center">
-                              {project.projectName}
-                            </td>
-                            <td className="px-[0.7vw] py-[0.56vw] text-[0.86vw] text-gray-600 border border-gray-300 text-center">
-                              {project.projectCategory}
-                            </td>
-                            <td className="px-[0.7vw] py-[0.56vw] border border-gray-300 text-center">
-                              <button
-                                onClick={() => openAddModal(project)}
-                                className="px-[1vw] py-[0.35vw] rounded-lg text-[0.75vw] bg-blue-600 text-white hover:bg-blue-700 transition cursor-pointer"
-                              >
-                                Update
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
+                        {paginatedProjects.map((project, index) => {
+                          const statusInfo = getProjectStatus(project);
+                          const bgColorClass = 
+                            statusInfo.color === "green" 
+                              ? "bg-green-50" 
+                              : statusInfo.color === "red" 
+                              ? "bg-red-50" 
+                              : "hover:bg-gray-50";
+                          const textColorClass = 
+                            statusInfo.color === "green" 
+                              ? "text-green-800" 
+                              : statusInfo.color === "red" 
+                              ? "text-red-800" 
+                              : "text-gray-600";
+                          const statusBgColor = 
+                            statusInfo.color === "green" 
+                              ? "bg-green-100" 
+                              : statusInfo.color === "red" 
+                              ? "bg-red-100" 
+                              : "bg-gray-100";
+                          const statusTextColor = 
+                            statusInfo.color === "green" 
+                              ? "text-green-700" 
+                              : statusInfo.color === "red" 
+                              ? "text-red-700" 
+                              : "text-gray-700";
+
+                          return (
+                            <tr
+                              key={project.id}
+                              className={`transition-colors ${bgColorClass}`}
+                            >
+                              <td className={`px-[0.7vw] py-[0.56vw] text-[0.86vw] font-medium border border-gray-300 text-center ${textColorClass}`}>
+                                {String(startIndex + index + 1).padStart(2, "0")}
+                              </td>
+                              <td className={`px-[0.7vw] py-[0.56vw] text-[0.86vw] border border-gray-300 text-center ${textColorClass}`}>
+                                {project.companyName}
+                              </td>
+                              <td className={`px-[0.7vw] py-[0.56vw] text-[0.86vw] border border-gray-300 text-center ${textColorClass}`}>
+                                {project.customerName}
+                              </td>
+                              <td className={`px-[0.7vw] py-[0.56vw] text-[0.86vw] border border-gray-300 text-center ${textColorClass}`}>
+                                {project.projectName}
+                              </td>
+                              <td className={`px-[0.7vw] py-[0.56vw] text-[0.86vw] border border-gray-300 text-center ${textColorClass}`}>
+                                {project.projectCategory}
+                              </td>
+                              <td className={`px-[0.7vw] py-[0.56vw] border border-gray-300 text-center`}>
+                                <span className={`px-[0.6vw] py-[0.3vw] rounded text-[0.75vw] font-medium ${statusBgColor} ${statusTextColor}`}>
+                                  {statusInfo.label}
+                                </span>
+                              </td>
+                              <td className="px-[0.7vw] py-[0.56vw] border border-gray-300 text-center">
+                                <button
+                                  onClick={() => openAddModal(project)}
+                                  className="px-[1vw] py-[0.35vw] rounded-lg text-[0.75vw] bg-blue-600 text-white hover:bg-blue-700 transition cursor-pointer"
+                                >
+                                  Update
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>

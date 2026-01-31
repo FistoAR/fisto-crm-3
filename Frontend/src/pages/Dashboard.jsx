@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import Personal from "../components/Dashboard/Personal";
-import Budgets from "../components/Dashboard/Budgets";
+// import Budgets from "../components/Dashboard/Budgets";
 
 const Dashboard = () => {
   const [user, setUser] = useState(null);
@@ -28,7 +28,7 @@ const Dashboard = () => {
   };
 
   return (
-    <div className="bg-gray-100 h-[91.2vh]">
+    <div className="bg-gray-100 h-[100vh]">
       {/* {user?.role !== "Employee" && (
         <header className=" flex justify-end gap-[0.8vw] w-full h-[8%]">
           <div className="flex items-start gap-[0.5vw]">

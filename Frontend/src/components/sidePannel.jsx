@@ -48,6 +48,8 @@ export default function Sidebar() {
     if (designation === "Software Developer") return "softwareDeveloper";
     if (designation === "UI/UX") return "designer";
     if (designation === "3D") return "threeD";
+    if (designation === "Project Head") return "projectHead";
+    if (designation === "SBU") return "sbu";
     return "";
   }
 
@@ -269,13 +271,13 @@ export default function Sidebar() {
             )}
 
           {/* Project Head-only menu items - Only for On Role employees */}
-          {employeementType === "On Role" && designation === "Project Head" && (
+          {employeementType === "On Role" &&  ["Project Head", "SBU"].includes(designation) && (
             <>
               <li className="h-[10%] flex items-center">
                 <Link
-                  to="/projectHead/analytics"
+                  to={`/${getPathPrefix(designation)}/analytics`}  
                   className={`${linkClasses(
-                    "/projectHead/analytics",
+                    `/${getPathPrefix(designation)}/analytics`,
                     true
                   )} flex items-center gap-[1.3vw] w-full`}
                 >
@@ -285,7 +287,7 @@ export default function Sidebar() {
                     className="w-[1.4vw] h-[1.4vw]"
                     style={{
                       filter: location.pathname.startsWith(
-                        "/projectHead/analytics"
+                        `/${getPathPrefix(designation)}/analytics`
                       )
                         ? "brightness(0) invert(1)"
                         : "none",
@@ -297,9 +299,9 @@ export default function Sidebar() {
 
               <li className="h-[10%] flex items-center">
                 <Link
-                  to="/projectHead/addReports"
+                  to={`/${getPathPrefix(designation)}/addReports`}
                   className={`${linkClasses(
-                    "/projectHead/addReports",
+                    `/${getPathPrefix(designation)}/addReports`,
                     true
                   )} flex items-center gap-[1.3vw] w-full`}
                 >
@@ -309,7 +311,7 @@ export default function Sidebar() {
                     className="w-[1.4vw] h-[1.4vw]"
                     style={{
                       filter: location.pathname.startsWith(
-                        "/projectHead/addReports"
+                        `/${getPathPrefix(designation)}/addReports`
                       )
                         ? "brightness(0) invert(1)"
                         : "none",
@@ -321,9 +323,9 @@ export default function Sidebar() {
 
               <li className="h-[10%] flex items-center">
                 <Link
-                  to="/projectHead/reports"
+                  to={`/${getPathPrefix(designation)}/reports`}
                   className={`${linkClasses(
-                    "/projectHead/reports",
+                    `/${getPathPrefix(designation)}/reports`,
                     true
                   )} flex items-center gap-[1.3vw] w-full`}
                 >
@@ -333,7 +335,7 @@ export default function Sidebar() {
                     className="w-[1.4vw] h-[1.4vw]"
                     style={{
                       filter: location.pathname.startsWith(
-                        "/projectHead/reports"
+                        `/${getPathPrefix(designation)}/reports`
                       )
                         ? "brightness(0) invert(1)"
                         : "none",
@@ -345,9 +347,9 @@ export default function Sidebar() {
 
               <li className="h-[10%] flex items-center">
                 <Link
-                  to="/projectHead/addProject"
+                  to={`/${getPathPrefix(designation)}/addProject`}
                   className={`${linkClasses(
-                    "/projectHead/addProject",
+                    `/${getPathPrefix(designation)}/addProject`,
                     true
                   )} flex items-center gap-[1.3vw] w-full`}
                 >
@@ -357,7 +359,7 @@ export default function Sidebar() {
                     className="w-[1.4vw] h-[1.4vw]"
                     style={{
                       filter: location.pathname.startsWith(
-                        "/projectHead/addProject"
+                        `/${getPathPrefix(designation)}/addProject`
                       )
                         ? "brightness(0) invert(1)"
                         : "none",
@@ -369,9 +371,9 @@ export default function Sidebar() {
 
               <li className="h-[10%] flex items-center">
                 <Link
-                  to="/projectHead/hrActivities"
+                  to={`/${getPathPrefix(designation)}/hrActivities`}
                   className={`${linkClasses(
-                    "/projectHead/hrActivities",
+                    `/${getPathPrefix(designation)}/hrActivities`,
                     true
                   )} flex items-center gap-[1.3vw] w-full`}
                 >
@@ -381,7 +383,7 @@ export default function Sidebar() {
                     className="w-[1.4vw] h-[1.4vw]"
                     style={{
                       filter: location.pathname.startsWith(
-                        "/projectHead/hrActivities"
+                        `/${getPathPrefix(designation)}/hrActivities`
                       )
                         ? "brightness(0) invert(1)"
                         : "none",
@@ -393,9 +395,9 @@ export default function Sidebar() {
 
                <li className="h-[10%] flex items-center">
                   <Link
-                    to="/marketing/resource"
+                    to={`/${getPathPrefix(designation)}/resource`}
                     className={`${linkClasses(
-                      "/marketing/resource",
+                      `/${getPathPrefix(designation)}/resource`,
                       true
                     )} flex items-center gap-[1.3vw] w-full`}
                   >
@@ -405,7 +407,7 @@ export default function Sidebar() {
                       className="w-[1.4vw] h-[1.4vw]"
                       style={{
                         filter: location.pathname.startsWith(
-                          "/marketing/resource"
+                          `/${getPathPrefix(designation)}/resource`
                         )
                           ? "brightness(0) invert(1)"
                           : "none",
@@ -417,9 +419,9 @@ export default function Sidebar() {
 
               <li className="h-[10%] flex items-center">
                 <Link
-                  to="/projectHead/workdone"
+                  to={`/${getPathPrefix(designation)}/workdone`}
                   className={`${linkClasses(
-                    "/projectHead/workdone",
+                    `/${getPathPrefix(designation)}/workdone`,
                     true
                   )} flex items-center gap-[1.3vw] w-full`}
                 >
@@ -429,7 +431,7 @@ export default function Sidebar() {
                     className="w-[1.4vw] h-[1.4vw]"
                     style={{
                       filter: location.pathname.startsWith(
-                        "/projectHead/workdone"
+                        `/${getPathPrefix(designation)}/workdone`
                       )
                         ? "brightness(0) invert(1)"
                         : "none",
