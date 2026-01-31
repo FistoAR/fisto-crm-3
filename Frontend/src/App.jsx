@@ -89,7 +89,7 @@ function AppContent() {
 
 
   return (
-    <Router basename="/fisto_crm/">
+    <Router >
       <Routes>
         {/* Login Route - No Sidebar/Navbar */}
         <Route path="/" element={<Login />} />
